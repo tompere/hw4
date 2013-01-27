@@ -765,6 +765,7 @@
 			((pe-bvar? pe) (cg-bvar (cdr pe)))
 			; ((pe-fvar? pe) (cg-fvar (cdr pe) env))
 			((pe-lambda-simple? pe) (cg-lambda-simple (cdr pe) env))
+			((pe-lambda-opt? pe) (cg-lambda-opt (cdr pe) env))
 			((pe-applic? pe) (cg-applic (cdr pe) env))
 			;((pe-pr
 			(else "")
@@ -892,23 +893,24 @@
 (define cg-lambda-simple
 	(lambda (pe env)
 		(set-unique-tag)
+		(display (cadr pe))
 		(let 
 			((unique-tag (number->string current-unique-tag))
 			(params (car pe))
 			(body (cadr pe)))
 			(string-append
-				"\t/* lambda-simple " unique-tag "*/\n"
+				"\t/* Part A : lambda-simple " unique-tag "*/\n"
 				"\tPUSH(IMM(3));\n"
 				"\tCALL(MALLOC);\n"
 				"\tDROP(IMM(1));\n"
 				"\tMOV(IND(R0),IMM(T_CLOSURE));\n"
-				"\tMOV(R1,R0);\n"
+				"\tMOV(R1,R0);\n" ;R1[0] points on R0 address (with T_CLOSURE at the moment)
 				"\tPUSH(IMM(" (number->string (+ env 1)) "));\n"
 				"\tCALL(MALLOC);\n"
 				"\tDROP(IMM(1));\n"
-				"\tMOV(INDD(R1,1),R0);\n"
+				"\tMOV(INDD(R1,1),R0);\n" ;R1[1] gets the increased-by-one enviornment 
 				"\tMOV(R2,IMM(0));\n"
-				"\tMOV(R3,IMM(1));\n"
+				"\tMOV(R3,IMM(1));\n" 
 				"LOOP_" unique-tag ":\n"
 				"\tCMP(R2,IMM(" (number->string env) "));\n"
 				"\tJUMP_GE(END_LOOP_" unique-tag ");\n"
@@ -936,6 +938,7 @@
 				"\tMOV(INDD(R1,2),LABEL(L_CLOS_CODE_" unique-tag "));\n"
 				"\tMOV(R0,R1);\n"
 				"\tJUMP(L_CLOS_EXIT_" unique-tag ");\n"
+				"\t/* Part B : lambda-simple " unique-tag "*/\n"
 				"L_CLOS_CODE_" unique-tag ":\n"
 				"\tPUSH(FP);\n"
 				"\tMOV(FP,SP);\n"
@@ -944,7 +947,89 @@
 				"RETURN;\n"
 				"L_CLOS_EXIT_" unique-tag ":\n"
 		))))
-	
+
+(define cg-lambda-opt
+	(lambda (pe env)
+		(set-unique-tag)
+		(let 
+			((unique-tag (number->string current-unique-tag))
+			(params (car pe))
+			(rest-param-index (number->string (+ (length (car pe)) 2)))
+			(body (caddr pe)))
+			(string-append
+				"\t/* Part A : lambda-opt " unique-tag "*/\n"
+				"\tPUSH(IMM(3));\n"
+				"\tCALL(MALLOC);\n"
+				"\tDROP(IMM(1));\n"
+				"\tMOV(IND(R0),IMM(T_CLOSURE));\n"
+				"\tMOV(R1,R0);\n" ;R1[0] points on R0 address (with T_CLOSURE at the moment)
+				"\tPUSH(IMM(" (number->string (+ env 1)) "));\n"
+				"\tCALL(MALLOC);\n"
+				"\tDROP(IMM(1));\n"
+				"\tMOV(INDD(R1,1),R0);\n" ;R1[1] gets the increased-by-one enviornment 
+				"\tMOV(R2,IMM(0));\n"
+				"\tMOV(R3,IMM(1));\n" 
+				"LOOP_" unique-tag ":\n"
+				"\tCMP(R2,IMM(" (number->string env) "));\n"
+				"\tJUMP_GE(END_LOOP_" unique-tag ");\n"
+				"\tMOV(R4,FPARG(0));\n"
+				"\tMOV(INDD(R0,R3),INDD(R4,R2));\n"
+				"\tADD(R2,IMM(1));\n"
+				"\tADD(R3,IMM(1));\n"
+				"\tJUMP(LOOP_" unique-tag ");\n"
+				"END_LOOP_" unique-tag ":\n"
+				"\tMOV(R2,R0);\n"
+				"\tPUSH(FPARG(1));\n"
+				"\tCALL(MALLOC);\n"
+				"\tDROP(IMM(1));\n"
+				"\tMOV(IND(R2),R0);\n"
+				"\tMOV(R4,IMM(0));\n"
+				"\tMOV(R5,IMM(2));\n"
+				"LOOP_PARAMS_" unique-tag ":\n"
+				"\tCMP(R4,FPARG(1));\n"
+				"\tJUMP_GE(END_LOOP_PARAMS_" unique-tag ");\n"
+				"\tMOV(INDD(R0,R4),FPARG(R5));\n"
+				"\tADD(R5,IMM(1));\n"
+				"\tADD(R4,IMM(1));\n"
+				"\tJUMP(LOOP_PARAMS_" unique-tag ");\n"
+				"END_LOOP_PARAMS_" unique-tag ":\n"
+				"\tMOV(INDD(R1,2),LABEL(L_CLOS_CODE_" unique-tag "));\n"
+				"\tMOV(R0,R1);\n"
+				"\tJUMP(L_CLOS_EXIT_" unique-tag ");\n"
+				"\t/* Part B : lambda-opt " unique-tag "*/\n"
+				"L_CLOS_CODE_" unique-tag ":\n"
+				"\tPUSH(FP);\n"
+				"\tMOV(FP,SP);\n"
+				"\t/* stack adjustment for lambda-opt : make a list (based on pairs) for each FPARG(i) */\n"
+				;???????????????????????
+				"\tMOV(R7,IMM(FPARG(1)));\n"
+				"\tADD(R7,IMM(1));\n"
+				"\tPUSH(IMM(11));\n"
+				"\tPUSH(FPARG(R7));\n"
+				"\tCALL(MAKE_SOB_PAIR);\n"
+				"\tDROP(IMM(2));\n"
+				"\tSUB(R7,IMM(1));\n"
+				;loop - make lisy of T_PAIR
+				"LOOP_PARAMS_OPT_" unique-tag ":\n"
+				"\tCMP(R7,IMM(" rest-param-index "));\n"	
+				"\tJUMP_LT(END_LOOP_PARAMS_OPT_" unique-tag ");\n"
+				"\tPUSH(FPARG(R7));\n"
+				"\tPUSH(R0);\n"
+				"\tCALL(MAKE_SOB_PAIR);\n"
+				"\tDROP(IMM(2));\n"
+				"\tSUB(R7,IMM(1));\n"
+				"\tJUMP(LOOP_PARAMS_OPT_" unique-tag ");\n"
+				; end of loop
+				"\tEND_LOOP_PARAMS_OPT_" unique-tag ":\n"
+				; insert list into FPARG(params + 1)
+				"\tMOV(FPARG(" rest-param-index "),R0);\n"
+				"\t/* lambda-opt body */\n"
+				(code-gen body (+ env 1))
+				"\tPOP(FP);\n"
+				"\tRETURN;\n"
+				"L_CLOS_EXIT_" unique-tag ":\n"
+		))))
+		
 (define cg-applic
 	(lambda (pe env)
 		(set-unique-tag)
@@ -955,10 +1040,12 @@
 			(string-append
 				"\t/* applic_" unique-tag "*/\n"
 				(map-cg-applic operands env unique-tag 0)
+				"\t/* pushing number of operands to stack */\n"
 				"\tPUSH(IMM(" (number->string (length operands)) "));\n"
-				"\t/* procedure applic */\n"
+				"\t/* generate applic's operator code */\n"
 				(code-gen procedure env)
 				; ???? make sure [something] is an SOB type (CMP(SOB_TYPE)), if not - go to error "no such type"
+				"\t/* final stage of the procedure */\n"
 				"\tPUSH(INDD(R0,1));\n"
 				"\tCALLA(INDD(R0,2));\n"
 ;				"\tMOV(IND(R1),IMM(2));\n"
@@ -1016,6 +1103,10 @@
 (define pe-lambda-simple?
 	(lambda (pe)
 		(if (eq? (car pe) 'lambda-simple) #t #f)))
+
+(define pe-lambda-opt?
+	(lambda (pe)
+		(if (eq? (car pe) 'lambda-opt) #t #f)))
 
 (define pe-applic?
 	(lambda (pe)

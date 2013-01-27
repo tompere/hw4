@@ -1,0 +1,1 @@
+((lambda(a b c . rest) rest ) #f #f #f #t #t #t #f)
