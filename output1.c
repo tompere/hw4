@@ -79,32 +79,14 @@ CONTINUE:
 			RETURN;*/
 	/* End of IS_SOB_TYPE */
 	
-		/* applic_3342067*/
-	/* applic_3342067 - B7 */
-	MOV(R0, IMM(12));
-	PUSH(R0);
-	/* applic_3342067 - B6 */
+		/* applic_3342061*/
+	/* applic_3342061 - B1 */
 	MOV(R0, IMM(14));
-	PUSH(R0);
-	/* applic_3342067 - B5 */
-	MOV(R0, IMM(14));
-	PUSH(R0);
-	/* applic_3342067 - B4 */
-	MOV(R0, IMM(14));
-	PUSH(R0);
-	/* applic_3342067 - B3 */
-	MOV(R0, IMM(12));
-	PUSH(R0);
-	/* applic_3342067 - B2 */
-	MOV(R0, IMM(12));
-	PUSH(R0);
-	/* applic_3342067 - B1 */
-	MOV(R0, IMM(12));
 	PUSH(R0);
 	/* pushing number of operands to stack */
-	PUSH(IMM(7));
+	PUSH(IMM(1));
 	/* generate applic's operator code */
-	/* Part A : lambda-opt 3342068*/
+	/* Part A : lambda-simple 3342062*/
 	PUSH(IMM(3));
 	CALL(MALLOC);
 	DROP(IMM(1));
@@ -116,15 +98,15 @@ CONTINUE:
 	MOV(INDD(R1,1),R0);
 	MOV(R2,IMM(0));
 	MOV(R3,IMM(1));
-LOOP_3342068:
+LOOP_3342062:
 	CMP(R2,IMM(0));
-	JUMP_GE(END_LOOP_3342068);
+	JUMP_GE(END_LOOP_3342062);
 	MOV(R4,FPARG(0));
 	MOV(INDD(R0,R3),INDD(R4,R2));
 	ADD(R2,IMM(1));
 	ADD(R3,IMM(1));
-	JUMP(LOOP_3342068);
-END_LOOP_3342068:
+	JUMP(LOOP_3342062);
+END_LOOP_3342062:
 	MOV(R2,R0);
 	PUSH(FPARG(1));
 	CALL(MALLOC);
@@ -132,46 +114,26 @@ END_LOOP_3342068:
 	MOV(IND(R2),R0);
 	MOV(R4,IMM(0));
 	MOV(R5,IMM(2));
-LOOP_PARAMS_3342068:
+LOOP_PARAMS_3342062:
 	CMP(R4,FPARG(1));
-	JUMP_GE(END_LOOP_PARAMS_3342068);
+	JUMP_GE(END_LOOP_PARAMS_3342062);
 	MOV(INDD(R0,R4),FPARG(R5));
 	ADD(R5,IMM(1));
 	ADD(R4,IMM(1));
-	JUMP(LOOP_PARAMS_3342068);
-END_LOOP_PARAMS_3342068:
-	MOV(INDD(R1,2),LABEL(L_CLOS_CODE_3342068));
+	JUMP(LOOP_PARAMS_3342062);
+END_LOOP_PARAMS_3342062:
+	MOV(INDD(R1,2),LABEL(L_CLOS_CODE_3342062));
 	MOV(R0,R1);
-	JUMP(L_CLOS_EXIT_3342068);
-	/* Part B : lambda-opt 3342068*/
-L_CLOS_CODE_3342068:
+	JUMP(L_CLOS_EXIT_3342062);
+	/* Part B : lambda-simple 3342062*/
+L_CLOS_CODE_3342062:
 	PUSH(FP);
 	MOV(FP,SP);
-	/* stack adjustment for lambda-opt : make a list (based on pairs) for each FPARG(i) */
-	MOV(R7,IMM(FPARG(1)));
-	ADD(R7,IMM(1));
-	PUSH(IMM(11));
-	PUSH(FPARG(R7));
-	CALL(MAKE_SOB_PAIR);
-	DROP(IMM(2));
-	SUB(R7,IMM(1));
-LOOP_PARAMS_OPT_3342068:
-	CMP(R7,IMM(5));
-	JUMP_LT(END_LOOP_PARAMS_OPT_3342068);
-	PUSH(FPARG(R7));
-	PUSH(R0);
-	CALL(MAKE_SOB_PAIR);
-	DROP(IMM(2));
-	SUB(R7,IMM(1));
-	JUMP(LOOP_PARAMS_OPT_3342068);
-	END_LOOP_PARAMS_OPT_3342068:
-	MOV(FPARG(5),R0);
-	/* lambda-opt body */
-	/* pvar_rest */
-	MOV(R0,FPARG(5));
+	/* pvar_x */
+	MOV(R0,FPARG(2));
 	POP(FP);
-	RETURN;
-L_CLOS_EXIT_3342068:
+RETURN;
+L_CLOS_EXIT_3342062:
 	/* final stage of the procedure */
 	PUSH(INDD(R0,1));
 	CALLA(INDD(R0,2));

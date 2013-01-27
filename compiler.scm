@@ -766,6 +766,7 @@
 			; ((pe-fvar? pe) (cg-fvar (cdr pe) env))
 			((pe-lambda-simple? pe) (cg-lambda-simple (cdr pe) env))
 			((pe-lambda-opt? pe) (cg-lambda-opt (cdr pe) env))
+			((pe-lambda-variadic? pe) (cg-lambda-variadic (cdr pe) env))
 			((pe-applic? pe) (cg-applic (cdr pe) env))
 			;((pe-pr
 			(else "")
@@ -893,7 +894,6 @@
 (define cg-lambda-simple
 	(lambda (pe env)
 		(set-unique-tag)
-		(display (cadr pe))
 		(let 
 			((unique-tag (number->string current-unique-tag))
 			(params (car pe))
@@ -1030,6 +1030,84 @@
 				"L_CLOS_EXIT_" unique-tag ":\n"
 		))))
 		
+		
+(define cg-lambda-variadic
+	(lambda (pe env)
+		(set-unique-tag)
+		(let 
+			((unique-tag (number->string current-unique-tag))
+			(body (cadr pe)))
+			(string-append
+				"\t/* Part A : lambda-variadic " unique-tag "*/\n"
+				"\tPUSH(IMM(3));\n"
+				"\tCALL(MALLOC);\n"
+				"\tDROP(IMM(1));\n"
+				"\tMOV(IND(R0),IMM(T_CLOSURE));\n"
+				"\tMOV(R1,R0);\n" ;R1[0] points on R0 address (with T_CLOSURE at the moment)
+				"\tPUSH(IMM(" (number->string (+ env 1)) "));\n"
+				"\tCALL(MALLOC);\n"
+				"\tDROP(IMM(1));\n"
+				"\tMOV(INDD(R1,1),R0);\n" ;R1[1] gets the increased-by-one enviornment 
+				"\tMOV(R2,IMM(0));\n"
+				"\tMOV(R3,IMM(1));\n" 
+				"LOOP_" unique-tag ":\n"
+				"\tCMP(R2,IMM(" (number->string env) "));\n"
+				"\tJUMP_GE(END_LOOP_" unique-tag ");\n"
+				"\tMOV(R4,FPARG(0));\n"
+				"\tMOV(INDD(R0,R3),INDD(R4,R2));\n"
+				"\tADD(R2,IMM(1));\n"
+				"\tADD(R3,IMM(1));\n"
+				"\tJUMP(LOOP_" unique-tag ");\n"
+				"END_LOOP_" unique-tag ":\n"
+				"\tMOV(R2,R0);\n"
+				"\tPUSH(FPARG(1));\n"
+				"\tCALL(MALLOC);\n"
+				"\tDROP(IMM(1));\n"
+				"\tMOV(IND(R2),R0);\n"
+				"\tMOV(R4,IMM(0));\n"
+				"\tMOV(R5,IMM(2));\n"
+				"LOOP_PARAMS_" unique-tag ":\n"
+				"\tCMP(R4,FPARG(1));\n"
+				"\tJUMP_GE(END_LOOP_PARAMS_" unique-tag ");\n"
+				"\tMOV(INDD(R0,R4),FPARG(R5));\n"
+				"\tADD(R5,IMM(1));\n"
+				"\tADD(R4,IMM(1));\n"
+				"\tJUMP(LOOP_PARAMS_" unique-tag ");\n"
+				"END_LOOP_PARAMS_" unique-tag ":\n"
+				"\tMOV(INDD(R1,2),LABEL(L_CLOS_CODE_" unique-tag "));\n"
+				"\tMOV(R0,R1);\n"
+				"\tJUMP(L_CLOS_EXIT_" unique-tag ");\n"
+				"\t/* Part B : lambda-variadic " unique-tag "*/\n"
+				"L_CLOS_CODE_" unique-tag ":\n"
+				"\tPUSH(FP);\n"
+				"\tMOV(FP,SP);\n"
+				"\t/* stack adjustment for lambda-variadic : make a list (based on pairs) */\n"
+				"\tMOV(R8,IMM(FPARG(1)));\n"
+				"\tADD(R8,IMM(1));\n"
+				"\tPUSH(IMM(11));\n"
+				"\tPUSH(FPARG(R8));\n"
+				"\tCALL(MAKE_SOB_PAIR);\n"
+				"\tDROP(IMM(2));\n"
+				"\tSUB(R8,IMM(1));\n"
+				;loop - make lisy of T_PAIR
+				"LOOP_PARAMS_VARIADIC_" unique-tag ":\n"
+				"\tCMP(R8,IMM(2));\n"	
+				"\tJUMP_LT(END_LOOP_PARAMS_VARIADIC_" unique-tag ");\n"
+				"\tPUSH(FPARG(R8));\n"
+				"\tPUSH(R0);\n"
+				"\tCALL(MAKE_SOB_PAIR);\n"
+				"\tDROP(IMM(2));\n"
+				"\tSUB(R8,IMM(1));\n"
+				"\tJUMP(LOOP_PARAMS_VARIADIC_" unique-tag ");\n"
+				"\tEND_LOOP_PARAMS_VARIADIC_" unique-tag ":\n"
+				"\tMOV(FPARG(2),R0);\n"
+				"\t/* lambda-variadic body */\n"
+				(code-gen body (+ env 1))
+				"\tPOP(FP);\n"
+				"\tRETURN;\n"
+				"L_CLOS_EXIT_" unique-tag ":\n"
+		))))
+		
 (define cg-applic
 	(lambda (pe env)
 		(set-unique-tag)
@@ -1107,6 +1185,10 @@
 (define pe-lambda-opt?
 	(lambda (pe)
 		(if (eq? (car pe) 'lambda-opt) #t #f)))
+		
+(define pe-lambda-variadic?
+	(lambda (pe)
+		(if (eq? (car pe) 'lambda-variadic) #t #f)))
 
 (define pe-applic?
 	(lambda (pe)
