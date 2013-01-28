@@ -1,1 +1,1 @@
-((lambda (x) x) 4)
+((lambda (x y z) x) #\c 9 10)

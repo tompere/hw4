@@ -763,30 +763,31 @@
 			((pe-seq? pe) (cg-seq (cadr pe) env))
 			((pe-pvar? pe) (cg-pvar (cdr pe)))
 			((pe-bvar? pe) (cg-bvar (cdr pe)))
-			; ((pe-fvar? pe) (cg-fvar (cdr pe) env))
 			((pe-lambda-simple? pe) (cg-lambda-simple (cdr pe) env))
 			((pe-lambda-opt? pe) (cg-lambda-opt (cdr pe) env))
 			((pe-lambda-variadic? pe) (cg-lambda-variadic (cdr pe) env))
 			((pe-applic? pe) (cg-applic (cdr pe) env))
-			;((pe-pr
 			(else "")
 			)))
 			
 ;;;;;;;;;; sub-CodeGen function ;;;;;;;;;	
-	
+
 (define cg-const
 	(lambda (c)
-		(cond
-			((boolean? c) 
-				(if (equal? c #t)
-					"\tMOV(R0, IMM(14));\n"
-					"\tMOV(R0, IMM(12));\n"	))
-			((char? c) )
-			((number? c) )
-			((string? c) )
-			((vector? c) )
-;			((quoted? c) )
-			)))
+		(let ((const-address (get-const-address c global-const-address)))
+			(cond
+				((boolean? c) 
+					(if (equal? c #t)
+						"\tMOV(R0, IMM(14));\n"
+						"\tMOV(R0, IMM(12));\n"	))
+				((char? c) 
+						(string-append "\tMOV(R0,ADDR(" (number->string const-address) "));\n"))
+				((number? c) 
+						(string-append "\tMOV(R0,ADDR(" (number->string const-address) "));\n"))
+				((string? c) )
+				((vector? c) )
+	;			((quoted? c) )
+				))))
 
 (define cg-if-3
 	(lambda (pe env)
@@ -1001,7 +1002,6 @@
 				"\tPUSH(FP);\n"
 				"\tMOV(FP,SP);\n"
 				"\t/* stack adjustment for lambda-opt : make a list (based on pairs) for each FPARG(i) */\n"
-				;???????????????????????
 				"\tMOV(R7,IMM(FPARG(1)));\n"
 				"\tADD(R7,IMM(1));\n"
 				"\tPUSH(IMM(11));\n"
@@ -1089,7 +1089,7 @@
 				"\tCALL(MAKE_SOB_PAIR);\n"
 				"\tDROP(IMM(2));\n"
 				"\tSUB(R8,IMM(1));\n"
-				;loop - make lisy of T_PAIR
+				;loop - make list of T_PAIR
 				"LOOP_PARAMS_VARIADIC_" unique-tag ":\n"
 				"\tCMP(R8,IMM(2));\n"	
 				"\tJUMP_LT(END_LOOP_PARAMS_VARIADIC_" unique-tag ");\n"
@@ -1206,34 +1206,86 @@
 		
 ;;;;;;;;;; constants handle functions ;;;;;;;;;
 
-(define get-consts (lambda (code)
-          (tag-types (get-consts-list code '()) '() )))
+(define create-symbol-table
+	(lambda (consts-list)
+		; (type (caar consts-list) 
+		; (value (cadar consts-list)) 
+		; (index (caddar consts-list)) 
+		(cond
+			((null? consts-list)
+				"") ;return empty string
+			((eq? 'integer (caar consts-list))
+				(string-append
+					"\t/* Allocate memory and create the SOB integer " (number->string (cadar consts-list)) " */\n"
+					"\tMOV(R1,IMM(" (number->string (cadar consts-list)) "));\n"
+					"\tPUSH(R1);\n"
+					"\tCALL(MAKE_SOB_INTEGER);\n"
+					"\tMOV(ADDR(" (number->string (caddar consts-list)) "),R0);\n"
+					"\tDROP(IMM(1));\n"
+					(create-symbol-table (cdr consts-list))
+					))
+			((eq? 'char (caar consts-list))
+				(string-append
+					"\t/* Allocate memory and create the SOB char " (string (cadar consts-list)) " */\n"
+					"\tMOV(R1,IMM(" (number->string (char->integer (cadar consts-list))) "));\n"
+					"\tPUSH(R1);\n"
+					"\tCALL(MAKE_SOB_CHAR);\n"
+					"\tMOV(ADDR(" (number->string (caddar consts-list)) "),R0);\n"
+					"\tDROP(IMM(1));\n"
+					(create-symbol-table (cdr consts-list))
+					))		
+					)
+		))
+
+(define get-consts 
+	(lambda (code)
+          (tag-types (get-consts-list code '()) '() 16)))
 
 (define get-consts-list 
 	(lambda (code ans)
 		(cond 
 			((or (null? code) (not (list? code))) ans)					; end of exp
 			((pe-const? code) 											; single const exp
-				(if (member? (cadr code) ans)
-					ans
-					(append ans (cdr code))))
+				(if (or (member? (cadr code) ans) (boolean? (cadr code))) 
+						ans ;in case value is duplicate or boolean - don't insert to ans
+						(append ans (cdr code))))
             (else (get-consts-list (cdr code) (get-consts-list (car code) ans)))
         )))
-						
+
 (define tag-types 
-	(lambda (const-lst ans)
+	(lambda (const-lst ans index)
 		(cond 
 			((null? const-lst) ans)
-			((number? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (cons "T_INTEGER" (car const-lst))))))
-			((symbol? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (cons "T_SYMBOL" (car const-lst))))))
-			((pair? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (cons "T_PAIR" (car const-lst))))))
-			((string? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (cons "T_STRING" (car const-lst))))))
-			((char? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (cons "T_CHAR" (car const-lst))))))
-			((boolean? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (cons "T_BOOL" (car const-lst))))))
-			((vector? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (cons "T_VECTOR" (car const-lst))))))
+			((number? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 
+			'integer (car const-lst) index))) (+ index 1)))					
+			((char? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 
+			'char (car const-lst) index))) (+ index 1)))	
+			;TODO - check other types
+			((symbol? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 
+			'symbol (car const-lst) index))) (+ index 1)))
+			((pair? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 'pair (car const-lst) index)) (+ index 1))))
+			((string? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 'string (car const-lst) index)) (+ index 1))))		
+			((vector? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 'vector (car const-lst) index)) (+ index 1))))
 		)))
+		
+; assuming every constant will be found in global-const-address
+; (type (caar consts-list) 
+; (value (cadar consts-list)) 
+; (index (caddar consts-list)) 
+(define get-const-address
+	(lambda (c consts-list)
+		(cond 
+			((boolean? c) 0) ;address is hard-coded in boolean, therefore return value is fake
+			((eq? c (cadar consts-list)) (caddar consts-list)) ;found const! return address
+			(else (get-const-address c (cdr consts-list))) ; keep searching			
+		)))
+		
 
-
+; A global data structure which contains all constants in the code, according to the format:
+; ( type-tag . value . address in memory ) 
+; This list is set in the main function compile-scheme-file		
+(define global-const-address '())
+		
 ;;;;;;;;;; unique tagging ;;;;;;;;;;;
 		
 (define current-unique-tag 3342060)
@@ -1246,14 +1298,16 @@
 ;;; Q2 - Scheme Compiler
 ;;; Purpose: takes a scheme code and compiles it
 ;;; Input: scheme code
-;;; Output: executable file
+;;; Output: .c file
 
 ;; write the output assembly file
 ;; use "user-scheme-code.c" as an output example
 (define compile-scheme-file
 	(lambda (inputFileName outputFileName)
-		(let (	(output (open-output-file outputFileName 'replace))
-				(input (car (map pe->lex-pe (map parse (tokens->sexprs (list->tokens (file->list inputFileName)))))))) ;;;;add anotate-tc
+		(let (	(output (open-output-file outputFileName 'replace))			
+				(input (car (map pe->lex-pe (map parse (tokens->sexprs (list->tokens 
+				(file->list inputFileName)))))))    ) ;;;;add anotate-tc
+			(set! global-const-address (get-consts input))
 			(display 
 				(string-append
 					"	
@@ -1292,8 +1346,15 @@ CONTINUE:
 	MOV(ADDR(14), IMM(T_BOOL));
 	MOV(ADDR(15), IMM(1));
 	
+	/* create symbol table based on constants */
+	"
+	(create-symbol-table (get-consts input))	
+	"
+	
 	/* increase address */
-	ADD(ADDR(0), IMM(15));
+	/* === IMPORTANT : MAKE SURE INITIAL NUMBER STARTS FROM 15 (which is hard-coded) ==== */
+	ADD(ADDR(0), IMM(" (number->string (+ 15 (length global-const-address))) "))\n;"
+	"
 	/* END of initialization */
 	
 	/* Fake Env */
@@ -1302,41 +1363,8 @@ CONTINUE:
 	PUSH(LABEL(END));
 	PUSH(FP);
 	MOV(FP,SP);
-	
-	/* Internal function to check if a type is a SOB */
-	
-	/*IS_SOB_TYPE:
-		MOV(R0, STARG(0));
-		MOV(R0, IND(R0));
-		CMP(R0, IMM(T_VOID));
-		JUMP_EQ(TRUE_SOB_TYPE);
-		CMP(R0, IMM(T_NIL));
-		JUMP_EQ(TRUE_SOB_TYPE); 
-		CMP(R0, IMM(T_BOOL));
-		JUMP_EQ(TRUE_SOB_TYPE); 
-		CMP(R0, IMM(T_CHAR));
-		JUMP_EQ(TRUE_SOB_TYPE); 
-		CMP(R0, IMM(T_INTEGER));
-		JUMP_EQ(TRUE_SOB_TYPE);
-		CMP(R0, IMM(T_STRING));
-		JUMP_EQ(TRUE_SOB_TYPE);
-		CMP(R0, IMM(T_SYMBOL));
-		JUMP_EQ(TRUE_SOB_TYPE);
-		CMP(R0, IMM(T_PAIR));
-		JUMP_EQ(TRUE_SOB_TYPE);
-		CMP(R0, IMM(T_VECTOR));
-		JUMP_EQ(TRUE_SOB_TYPE);
-		CMP(R0, IMM(T_CLOSURE));
-		JUMP_EQ(TRUE_SOB_TYPE);
-		MOV(R0, IMM(0));
-		JUMP(EXIT_IS_SOB_TYPE);
-		TRUE_SOB_TYPE:
-			MOV(R0, IMM(1));
-		EXIT_IS_SOB_TYPE:
-			POP(FP);
-			RETURN;*/
-	/* End of IS_SOB_TYPE */
-	
+
+	/* code generation */
 	"
 	(code-gen input 0)	
 	"
@@ -1348,7 +1376,7 @@ END:
 	STOP_MACHINE;
 
 	return 0;
-}"				)
+}")
 				output) ;; check write / display
 			(close-output-port output))))
 			
