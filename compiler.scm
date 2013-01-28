@@ -784,7 +784,8 @@
 						(string-append "\tMOV(R0,ADDR(" (number->string const-address) "));\n"))
 				((number? c) 
 						(string-append "\tMOV(R0,ADDR(" (number->string const-address) "));\n"))
-				((string? c) )
+				((string? c) 
+						(string-append "\tMOV(R0,ADDR(" (number->string const-address) "));\n"))
 				((vector? c) )
 	;			((quoted? c) )
 				))))
@@ -1233,9 +1234,29 @@
 					"\tMOV(ADDR(" (number->string (caddar consts-list)) "),R0);\n"
 					"\tDROP(IMM(1));\n"
 					(create-symbol-table (cdr consts-list))
-					))		
-					)
+					))
+			((eq? 'string (caar consts-list))
+				(string-append
+					"\t/* Allocate memory and create the SOB string " (cadar consts-list) " */\n"
+					(cg-string-to-chars (cadar consts-list) (- (string-length (cadar consts-list)) 1))
+					"\tCALL(MAKE_SOB_STRING);\n"
+					"\tMOV(ADDR(" (number->string (caddar consts-list)) "),R0);\n"
+					"\tDROP(IMM(" (number->string (string-length (cadar consts-list))) "));\n"
+					(create-symbol-table (cdr consts-list))
+					))	
+			)
 		))
+
+(define cg-string-to-chars
+	(lambda (str index)
+		(if (eq? index -1)
+			""
+			(string-append
+				(cg-string-to-chars str (- index 1))
+				"\tMOV(R1,IMM(" (number->string (char->integer (string-ref str index))) "));\n"
+				"\tPUSH(R1);\n"			
+				))))
+		
 
 (define get-consts 
 	(lambda (code)
@@ -1260,11 +1281,13 @@
 			'integer (car const-lst) index))) (+ index 1)))					
 			((char? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 
 			'char (car const-lst) index))) (+ index 1)))	
+			((string? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 
+			'string (car const-lst) index))) (+ index 1)))	
+			
 			;TODO - check other types
 			((symbol? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 
 			'symbol (car const-lst) index))) (+ index 1)))
-			((pair? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 'pair (car const-lst) index)) (+ index 1))))
-			((string? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 'string (car const-lst) index)) (+ index 1))))		
+			((pair? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 'pair (car const-lst) index)) (+ index 1))))			
 			((vector? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 'vector (car const-lst) index)) (+ index 1))))
 		)))
 		
