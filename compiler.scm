@@ -1217,9 +1217,8 @@
 				"") ;return empty string
 			((eq? 'integer (caar consts-list))
 				(string-append
-					"\t/* Allocate memory and create the SOB integer " (number->string (cadar consts-list)) " */\n"
-					"\tMOV(R1,IMM(" (number->string (cadar consts-list)) "));\n"
-					"\tPUSH(R1);\n"
+					"\t/* Allocate memory and create the SOB integer: " (number->string (cadar consts-list)) " */\n"
+					"\tPUSH(IMM(" (number->string (cadar consts-list)) "));\n"
 					"\tCALL(MAKE_SOB_INTEGER);\n"
 					"\tMOV(ADDR(" (number->string (caddar consts-list)) "),R0);\n"
 					"\tDROP(IMM(1));\n"
@@ -1227,9 +1226,8 @@
 					))
 			((eq? 'char (caar consts-list))
 				(string-append
-					"\t/* Allocate memory and create the SOB char " (string (cadar consts-list)) " */\n"
-					"\tMOV(R1,IMM(" (number->string (char->integer (cadar consts-list))) "));\n"
-					"\tPUSH(R1);\n"
+					"\t/* Allocate memory and create the SOB char: " (string (cadar consts-list)) " */\n"
+					"\tPUSH(IMM(" (number->string (char->integer (cadar consts-list))) "));\n"
 					"\tCALL(MAKE_SOB_CHAR);\n"
 					"\tMOV(ADDR(" (number->string (caddar consts-list)) "),R0);\n"
 					"\tDROP(IMM(1));\n"
@@ -1237,11 +1235,12 @@
 					))
 			((eq? 'string (caar consts-list))
 				(string-append
-					"\t/* Allocate memory and create the SOB string " (cadar consts-list) " */\n"
+					"\t/* Allocate memory and create the SOB string: \"" (cadar consts-list) "\" */\n"
 					(cg-string-to-chars (cadar consts-list) (- (string-length (cadar consts-list)) 1))
+					"\tPUSH(IMM(" (number->string (string-length (cadar consts-list))) "));\n"
 					"\tCALL(MAKE_SOB_STRING);\n"
 					"\tMOV(ADDR(" (number->string (caddar consts-list)) "),R0);\n"
-					"\tDROP(IMM(" (number->string (string-length (cadar consts-list))) "));\n"
+					"\tDROP(IMM(" (number->string (+ 1 (string-length (cadar consts-list)))) "));\n"
 					(create-symbol-table (cdr consts-list))
 					))	
 			)
@@ -1253,8 +1252,7 @@
 			""
 			(string-append
 				(cg-string-to-chars str (- index 1))
-				"\tMOV(R1,IMM(" (number->string (char->integer (string-ref str index))) "));\n"
-				"\tPUSH(R1);\n"			
+				"\tPUSH(" (number->string (char->integer (string-ref str index))) ");\n"			
 				))))
 		
 
