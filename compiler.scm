@@ -781,11 +781,11 @@
 						"\tMOV(R0, IMM(14));\n"
 						"\tMOV(R0, IMM(12));\n"	))
 				((char? c) 
-						(string-append "\tMOV(R0,ADDR(" (number->string const-address) "));\n"))
+						(string-append "\tMOV(R0,IMM(" (number->string const-address) "));\n"))
 				((number? c) 
-						(string-append "\tMOV(R0,ADDR(" (number->string const-address) "));\n"))
+						(string-append "\tMOV(R0,IMM(" (number->string const-address) "));\n"))
 				((string? c) 
-						(string-append "\tMOV(R0,ADDR(" (number->string const-address) "));\n"))
+						(string-append "\tMOV(R0,IMM(" (number->string const-address) "));\n"))
 				((vector? c) )
 	;			((quoted? c) )
 				))))
@@ -1207,7 +1207,7 @@
 		
 ;;;;;;;;;; constants handle functions ;;;;;;;;;
 
-(define create-symbol-table
+(define create-consts-table
 	(lambda (consts-list)
 		; (type (caar consts-list) 
 		; (value (cadar consts-list)) 
@@ -1220,18 +1220,16 @@
 					"\t/* Allocate memory and create the SOB integer: " (number->string (cadar consts-list)) " */\n"
 					"\tPUSH(IMM(" (number->string (cadar consts-list)) "));\n"
 					"\tCALL(MAKE_SOB_INTEGER);\n"
-					"\tMOV(ADDR(" (number->string (caddar consts-list)) "),R0);\n"
 					"\tDROP(IMM(1));\n"
-					(create-symbol-table (cdr consts-list))
+					(create-consts-table (cdr consts-list))
 					))
 			((eq? 'char (caar consts-list))
 				(string-append
 					"\t/* Allocate memory and create the SOB char: " (string (cadar consts-list)) " */\n"
 					"\tPUSH(IMM(" (number->string (char->integer (cadar consts-list))) "));\n"
 					"\tCALL(MAKE_SOB_CHAR);\n"
-					"\tMOV(ADDR(" (number->string (caddar consts-list)) "),R0);\n"
 					"\tDROP(IMM(1));\n"
-					(create-symbol-table (cdr consts-list))
+					(create-consts-table (cdr consts-list))
 					))
 			((eq? 'string (caar consts-list))
 				(string-append
@@ -1239,9 +1237,8 @@
 					(cg-string-to-chars (cadar consts-list) (- (string-length (cadar consts-list)) 1))
 					"\tPUSH(IMM(" (number->string (string-length (cadar consts-list))) "));\n"
 					"\tCALL(MAKE_SOB_STRING);\n"
-					"\tMOV(ADDR(" (number->string (caddar consts-list)) "),R0);\n"
 					"\tDROP(IMM(" (number->string (+ 1 (string-length (cadar consts-list)))) "));\n"
-					(create-symbol-table (cdr consts-list))
+					(create-consts-table (cdr consts-list))
 					))	
 			)
 		))
@@ -1276,17 +1273,17 @@
 		(cond 
 			((null? const-lst) ans)
 			((number? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 
-			'integer (car const-lst) index))) (+ index 1)))					
+			'integer (car const-lst) index))) (+ index 2)))					
 			((char? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 
-			'char (car const-lst) index))) (+ index 1)))	
+			'char (car const-lst) index))) (+ index 2)))	
 			((string? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 
-			'string (car const-lst) index))) (+ index 1)))	
+			'string (car const-lst) index))) (+ index (+ 2 (string-length (car const-lst))))))	
 			
 			;TODO - check other types
-			((symbol? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 
-			'symbol (car const-lst) index))) (+ index 1)))
-			((pair? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 'pair (car const-lst) index)) (+ index 1))))			
-			((vector? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 'vector (car const-lst) index)) (+ index 1))))
+			; ((symbol? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 
+			; 'symbol (car const-lst) index))) (+ index 1)))
+			((pair? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 'pair (car const-lst) index)) (+ index 3))))			
+			((vector? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 'vector (car const-lst) index)) (+ index (+ 2 (vector-length (car const-lst)))))))
 		)))
 		
 ; assuming every constant will be found in global-const-address
@@ -1340,6 +1337,15 @@ int main()
 {
 	START_MACHINE;
 	
+	void print_heap(){
+		int i;
+		printf(\"\\n\");
+		printf(\"printing heap\\n\");
+		for (i=ADDR(0); i>=0; i--){
+			printf(\"\\t element %d: %d\\n\", i, ADDR(i));
+		}
+	}
+	
 	JUMP(CONTINUE);
 
 	#include \"scheme.lib\"
@@ -1367,15 +1373,16 @@ CONTINUE:
 	MOV(ADDR(14), IMM(T_BOOL));
 	MOV(ADDR(15), IMM(1));
 	
+	/* Increase address */
+	ADD(ADDR(0), IMM(15))\n;
+	
 	/* create symbol table based on constants */
 	"
-	(create-symbol-table (get-consts input))	
+	
+	(create-consts-table (get-consts input))	
+	
 	"
 	
-	/* increase address */
-	/* === IMPORTANT : MAKE SURE INITIAL NUMBER STARTS FROM 15 (which is hard-coded) ==== */
-	ADD(ADDR(0), IMM(" (number->string (+ 15 (length global-const-address))) "))\n;"
-	"
 	/* END of initialization */
 	
 	/* Fake Env */
@@ -1393,6 +1400,8 @@ END:
 	PUSH(R0);
 	CALL(WRITE_SOB);
 	DROP(IMM(1));
+	
+	print_heap();
 	
 	STOP_MACHINE;
 
