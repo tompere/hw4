@@ -1,1 +1,2 @@
-((lambda (x y z) z) "abcdefghijklmnopqrstuvwxyz" 2013 #\f)
+((lambda(x) (x #t)) 
+	(lambda (n) (if n #t #f)))

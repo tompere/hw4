@@ -732,15 +732,15 @@
 				;;;;;;;;;;;;;;;;;
 				((eq? (car pe) 'applic)
 					(if (eq? #t tc-flag)
-						`(tc-applic ,(run-tc (cadr pe) #t) ,(run-tc (caddr pe) #f))
-						`(applic ,(run-tc (cadr pe) #t) ,(map-run-tc (caddr pe) #f))))
+						`(tc-applic ,(run-tc (cadr pe) #f) ,(run-tc (caddr pe) #f))
+						`(applic ,(run-tc (cadr pe) #f) ,(map-run-tc (caddr pe) #f))))
 				(else (cons (run-tc (car pe) tc-flag) (run-tc (cdr pe) tc-flag) ))
 				
 				)))
 
 (define annotate-tc
   (lambda (pe)
-    (run-tc pe #t)))
+    (run-tc pe #f)))
 	
 	
 	
@@ -767,6 +767,7 @@
 			((pe-lambda-opt? pe) (cg-lambda-opt (cdr pe) env))
 			((pe-lambda-variadic? pe) (cg-lambda-variadic (cdr pe) env))
 			((pe-applic? pe) (cg-applic (cdr pe) env))
+			((pe-tc-applic? pe) (cg-tc-applic (cdr pe) env))
 			(else "")
 			)))
 			
@@ -1123,8 +1124,9 @@
 				"\tPUSH(IMM(" (number->string (length operands)) "));\n"
 				"\t/* generate applic's operator code */\n"
 				(code-gen procedure env)
-				; ???? make sure [something] is an SOB type (CMP(SOB_TYPE)), if not - go to error "no such type"
 				"\t/* final stage of the procedure */\n"
+				"\tCMP(INDD(R0,0),IMM(T_CLOSURE));\n"
+				"\tJUMP_NE(ERROR_NST);\n"
 				"\tPUSH(INDD(R0,1));\n"
 				"\tCALLA(INDD(R0,2));\n"
 ;				"\tMOV(IND(R1),IMM(2));\n"
@@ -1146,13 +1148,42 @@
 				"\tPUSH(R0);\n"
 				)
 		)))
+		
+(define cg-tc-applic
+	(lambda (pe env)
+		(set-unique-tag)
+		(let
+			((unique-tag (number->string current-unique-tag))
+			(procedure (car pe))
+			(operands (cadr pe)))
+			(string-append
+				"\t/* tc_applic_" unique-tag "*/\n"
+				(map-cg-applic operands env unique-tag 0)
+				"\t/* pushing number of operands to stack */\n"
+				"\tPUSH(IMM(" (number->string (length operands)) "));\n"
+				"\t/* generate tc_applic's operator code */\n"
+				(code-gen procedure env)
+				"\t/* final stage of the procedure */\n"
+				"\tCMP(INDD(R0,0),IMM(T_CLOSURE));\n"
+				"\tJUMP_NE(ERROR_NST);\n"
+				"\tPUSH(FPARG(-1));\n"
+				"\tMOV(FP,FPARG(-2));\n"
+				
+				;;;;;;;;; copy and run down the old frame ;;;;;;;;;;;
+				"\t/********************************************/\n"
+				
+				"\tJUMPA(INDD(R0,2));\n"
+			))))
+				
+
 
 ; (define cg-fvar
 	; (lambda (pe env)
 		; (cond
 			; ((is-premitive? (car pe)) )
 			; )))
-	
+
+			
 ;;;;;;;;;; isType? functions ;;;;;;;;;
 
 (define pe-const?
@@ -1194,6 +1225,10 @@
 (define pe-applic?
 	(lambda (pe)
 		(if (eq? (car pe) 'applic) #t #f)))
+
+(define pe-tc-applic?
+	(lambda (pe)
+		(if (eq? (car pe) 'tc-applic) #t #f)))
 		
 (define pe-fvar?
 	(lambda (pe)
@@ -1204,7 +1239,8 @@
 		(if (or (eq? pe '+) (eq? pe '-) (eq? pe '*) (eq? pe '/))
 			#t
 			#f)))
-		
+
+			
 ;;;;;;;;;; constants handle functions ;;;;;;;;;
 
 (define create-consts-table
@@ -1313,6 +1349,22 @@
 		(set! current-unique-tag (+ current-unique-tag 1))
 		))
 
+; A global error code
+(define error-code
+	(lambda()
+		(string-append
+			"\t/* error_no-such-type */\n"
+			"ERROR_NST:\n"
+			(cg-string-to-chars "Error: no such type" 18)
+			"\tPUSH(IMM(19));\n"
+			"\tCALL(MAKE_SOB_STRING);\n"
+			"\tDROP(IMM(20));\n"
+			"\tPUSH(R0);\n"
+			"\tCALL(WRITE_SOB_STRING);\n"
+			"return 1;"
+		)))
+			
+		
 ;;; Q2 - Scheme Compiler
 ;;; Purpose: takes a scheme code and compiles it
 ;;; Input: scheme code
@@ -1323,8 +1375,8 @@
 (define compile-scheme-file
 	(lambda (inputFileName outputFileName)
 		(let (	(output (open-output-file outputFileName 'replace))			
-				(input (car (map pe->lex-pe (map parse (tokens->sexprs (list->tokens 
-				(file->list inputFileName)))))))    ) ;;;;add anotate-tc
+				(input (car (map annotate-tc (map pe->lex-pe (map parse (tokens->sexprs (list->tokens 
+				(file->list inputFileName))))))))    ) ;;;;add anotate-tc
 			(set! global-const-address (get-consts input))
 			(display 
 				(string-append
@@ -1337,6 +1389,7 @@ int main()
 {
 	START_MACHINE;
 	
+	/* test functions section */
 	void print_heap(){
 		int i;
 		printf(\"\\n\");
@@ -1346,6 +1399,22 @@ int main()
 		}
 	}
 	
+	void print_stack(){
+        int i;
+        printf(\"printing stack, FP: %d SP: %d\\n\", (int)(FP), (int)(SP));
+        for(i=SP+5; i>=0; --i){
+			if(SP == i){
+				printf(\"SP \");
+			}
+			if(FP == i){
+				printf(\"FP \");
+			}
+			printf(\"\\telement %d: %d \\n\", i, STACK(i));
+        }
+	}
+	
+	/* end of test functions section */
+	
 	JUMP(CONTINUE);
 
 	#include \"scheme.lib\"
@@ -1354,7 +1423,11 @@ int main()
 	#include \"math.lib\"
 	#include \"string.lib\"
 	#include \"system.lib\"
+	
+	"
 
+	(error-code)
+"
 CONTINUE:
 	
 	/* Initialize stack with default values */
@@ -1400,9 +1473,7 @@ END:
 	PUSH(R0);
 	CALL(WRITE_SOB);
 	DROP(IMM(1));
-	
-	print_heap();
-	
+		
 	STOP_MACHINE;
 
 	return 0;

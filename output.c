@@ -7,6 +7,7 @@ int main()
 {
 	START_MACHINE;
 	
+	/* test functions section */
 	void print_heap(){
 		int i;
 		printf("\n");
@@ -16,6 +17,22 @@ int main()
 		}
 	}
 	
+	void print_stack(){
+        int i;
+        printf("printing stack, FP: %d SP: %d\n", (int)(FP), (int)(SP));
+        for(i=SP+5; i>=0; --i){
+			if(SP == i){
+				printf("SP ");
+			}
+			if(FP == i){
+				printf("FP ");
+			}
+			printf("\telement %d: %d \n", i, STACK(i));
+        }
+	}
+	
+	/* end of test functions section */
+	
 	JUMP(CONTINUE);
 
 	#include "scheme.lib"
@@ -24,7 +41,34 @@ int main()
 	#include "math.lib"
 	#include "string.lib"
 	#include "system.lib"
-
+	
+		/* error_no-such-type */
+ERROR_NST:
+	PUSH(69);
+	PUSH(114);
+	PUSH(114);
+	PUSH(111);
+	PUSH(114);
+	PUSH(58);
+	PUSH(32);
+	PUSH(110);
+	PUSH(111);
+	PUSH(32);
+	PUSH(115);
+	PUSH(117);
+	PUSH(99);
+	PUSH(104);
+	PUSH(32);
+	PUSH(116);
+	PUSH(121);
+	PUSH(112);
+	PUSH(101);
+	PUSH(IMM(19));
+	CALL(MAKE_SOB_STRING);
+	DROP(IMM(20));
+	PUSH(R0);
+	CALL(WRITE_SOB_STRING);
+return 1;
 CONTINUE:
 	
 	/* Initialize stack with default values */
@@ -48,45 +92,7 @@ CONTINUE:
 ;
 	
 	/* create symbol table based on constants */
-		/* Allocate memory and create the SOB string: "abcdefghijklmnopqrstuvwxyz" */
-	PUSH(97);
-	PUSH(98);
-	PUSH(99);
-	PUSH(100);
-	PUSH(101);
-	PUSH(102);
-	PUSH(103);
-	PUSH(104);
-	PUSH(105);
-	PUSH(106);
-	PUSH(107);
-	PUSH(108);
-	PUSH(109);
-	PUSH(110);
-	PUSH(111);
-	PUSH(112);
-	PUSH(113);
-	PUSH(114);
-	PUSH(115);
-	PUSH(116);
-	PUSH(117);
-	PUSH(118);
-	PUSH(119);
-	PUSH(120);
-	PUSH(121);
-	PUSH(122);
-	PUSH(IMM(26));
-	CALL(MAKE_SOB_STRING);
-	DROP(IMM(27));
-	/* Allocate memory and create the SOB integer: 2013 */
-	PUSH(IMM(2013));
-	CALL(MAKE_SOB_INTEGER);
-	DROP(IMM(1));
-	/* Allocate memory and create the SOB char: f */
-	PUSH(IMM(102));
-	CALL(MAKE_SOB_CHAR);
-	DROP(IMM(1));
-
+	
 	
 	/* END of initialization */
 	
@@ -98,20 +104,9 @@ CONTINUE:
 	MOV(FP,SP);
 
 	/* code generation */
-		/* applic_3342065*/
-	/* applic_3342065 - B3 */
-	MOV(R0,IMM(46));
-	PUSH(R0);
-	/* applic_3342065 - B2 */
-	MOV(R0,IMM(44));
-	PUSH(R0);
-	/* applic_3342065 - B1 */
-	MOV(R0,IMM(16));
-	PUSH(R0);
-	/* pushing number of operands to stack */
-	PUSH(IMM(3));
-	/* generate applic's operator code */
-	/* Part A : lambda-simple 3342066*/
+		/* applic_3342061*/
+	/* applic_3342061 - B1 */
+	/* Part A : lambda-simple 3342064*/
 	PUSH(IMM(3));
 	CALL(MALLOC);
 	DROP(IMM(1));
@@ -123,15 +118,15 @@ CONTINUE:
 	MOV(INDD(R1,1),R0);
 	MOV(R2,IMM(0));
 	MOV(R3,IMM(1));
-LOOP_3342066:
+LOOP_3342064:
 	CMP(R2,IMM(0));
-	JUMP_GE(END_LOOP_3342066);
+	JUMP_GE(END_LOOP_3342064);
 	MOV(R4,FPARG(0));
 	MOV(INDD(R0,R3),INDD(R4,R2));
 	ADD(R2,IMM(1));
 	ADD(R3,IMM(1));
-	JUMP(LOOP_3342066);
-END_LOOP_3342066:
+	JUMP(LOOP_3342064);
+END_LOOP_3342064:
 	MOV(R2,R0);
 	PUSH(FPARG(1));
 	CALL(MALLOC);
@@ -139,27 +134,105 @@ END_LOOP_3342066:
 	MOV(IND(R2),R0);
 	MOV(R4,IMM(0));
 	MOV(R5,IMM(2));
-LOOP_PARAMS_3342066:
+LOOP_PARAMS_3342064:
 	CMP(R4,FPARG(1));
-	JUMP_GE(END_LOOP_PARAMS_3342066);
+	JUMP_GE(END_LOOP_PARAMS_3342064);
 	MOV(INDD(R0,R4),FPARG(R5));
 	ADD(R5,IMM(1));
 	ADD(R4,IMM(1));
-	JUMP(LOOP_PARAMS_3342066);
-END_LOOP_PARAMS_3342066:
-	MOV(INDD(R1,2),LABEL(L_CLOS_CODE_3342066));
+	JUMP(LOOP_PARAMS_3342064);
+END_LOOP_PARAMS_3342064:
+	MOV(INDD(R1,2),LABEL(L_CLOS_CODE_3342064));
 	MOV(R0,R1);
-	JUMP(L_CLOS_EXIT_3342066);
-	/* Part B : lambda-simple 3342066*/
-L_CLOS_CODE_3342066:
+	JUMP(L_CLOS_EXIT_3342064);
+	/* Part B : lambda-simple 3342064*/
+L_CLOS_CODE_3342064:
 	PUSH(FP);
 	MOV(FP,SP);
-	/* pvar_z */
-	MOV(R0,FPARG(4));
+	/* Test if_3342065 */
+	/* pvar_n */
+	MOV(R0,FPARG(2));
+	CMP(INDD(R0,1),IMM(0));
+	JUMP_EQ(DIF_LABEL_3342065);
+	/* Do-if-true if_3342065 */
+	MOV(R0, IMM(14));
+	JUMP(END_IF_3342065);
+	DIF_LABEL_3342065:
+	/* Do-if-false if_3342065 */
+	MOV(R0, IMM(12));
+	END_IF_3342065:
 	POP(FP);
 RETURN;
-L_CLOS_EXIT_3342066:
+L_CLOS_EXIT_3342064:
+	PUSH(R0);
+	/* pushing number of operands to stack */
+	PUSH(IMM(1));
+	/* generate applic's operator code */
+	/* Part A : lambda-simple 3342062*/
+	PUSH(IMM(3));
+	CALL(MALLOC);
+	DROP(IMM(1));
+	MOV(IND(R0),IMM(T_CLOSURE));
+	MOV(R1,R0);
+	PUSH(IMM(1));
+	CALL(MALLOC);
+	DROP(IMM(1));
+	MOV(INDD(R1,1),R0);
+	MOV(R2,IMM(0));
+	MOV(R3,IMM(1));
+LOOP_3342062:
+	CMP(R2,IMM(0));
+	JUMP_GE(END_LOOP_3342062);
+	MOV(R4,FPARG(0));
+	MOV(INDD(R0,R3),INDD(R4,R2));
+	ADD(R2,IMM(1));
+	ADD(R3,IMM(1));
+	JUMP(LOOP_3342062);
+END_LOOP_3342062:
+	MOV(R2,R0);
+	PUSH(FPARG(1));
+	CALL(MALLOC);
+	DROP(IMM(1));
+	MOV(IND(R2),R0);
+	MOV(R4,IMM(0));
+	MOV(R5,IMM(2));
+LOOP_PARAMS_3342062:
+	CMP(R4,FPARG(1));
+	JUMP_GE(END_LOOP_PARAMS_3342062);
+	MOV(INDD(R0,R4),FPARG(R5));
+	ADD(R5,IMM(1));
+	ADD(R4,IMM(1));
+	JUMP(LOOP_PARAMS_3342062);
+END_LOOP_PARAMS_3342062:
+	MOV(INDD(R1,2),LABEL(L_CLOS_CODE_3342062));
+	MOV(R0,R1);
+	JUMP(L_CLOS_EXIT_3342062);
+	/* Part B : lambda-simple 3342062*/
+L_CLOS_CODE_3342062:
+	PUSH(FP);
+	MOV(FP,SP);
+	/* tc_applic_3342063*/
+	/* applic_3342063 - B1 */
+	MOV(R0, IMM(14));
+	PUSH(R0);
+	/* pushing number of operands to stack */
+	PUSH(IMM(1));
+	/* generate tc_applic's operator code */
+	/* pvar_x */
+	MOV(R0,FPARG(2));
 	/* final stage of the procedure */
+	CMP(INDD(R0,0),IMM(T_CLOSURE));
+	JUMP_NE(ERROR_NST);
+	PUSH(FPARG(-1));
+	MOV(FP,FPARG(-2));
+	/********************************************/
+	JUMPA(INDD(R0,2));
+	POP(FP);
+RETURN;
+L_CLOS_EXIT_3342062:
+	/* final stage of the procedure */
+	CMP(INDD(R0,0),IMM(T_CLOSURE));
+	JUMP_NE(ERROR_NST);
 	PUSH(INDD(R0,1));
 	CALLA(INDD(R0,2));
 	MOV(R6,STARG(0));
@@ -170,9 +243,7 @@ END:
 	PUSH(R0);
 	CALL(WRITE_SOB);
 	DROP(IMM(1));
-	
-	print_heap();
-	
+		
 	STOP_MACHINE;
 
 	return 0;
