@@ -781,14 +781,8 @@
 					(if (equal? c #t)
 						"\tMOV(R0, IMM(14));\n"
 						"\tMOV(R0, IMM(12));\n"	))
-				((char? c) 
+				((or (char? c) (number? c) (string? c) (vector? c) (pair? c))
 						(string-append "\tMOV(R0,IMM(" (number->string const-address) "));\n"))
-				((number? c) 
-						(string-append "\tMOV(R0,IMM(" (number->string const-address) "));\n"))
-				((string? c) 
-						(string-append "\tMOV(R0,IMM(" (number->string const-address) "));\n"))
-				((vector? c) )
-	;			((quoted? c) )
 				))))
 
 (define cg-if-3
@@ -1245,9 +1239,9 @@
 
 (define create-consts-table
 	(lambda (consts-list)
-		; (type (caar consts-list) 
-		; (value (cadar consts-list)) 
-		; (index (caddar consts-list)) 
+		; (type (caar consts-list)
+		; (value (cadar consts-list))
+		; (index (caddar consts-list))
 		(cond
 			((null? consts-list)
 				"") ;return empty string
@@ -1258,7 +1252,7 @@
 					"\tCALL(MAKE_SOB_INTEGER);\n"
 					"\tDROP(IMM(1));\n"
 					(create-consts-table (cdr consts-list))
-					))
+				))
 			((eq? 'char (caar consts-list))
 				(string-append
 					"\t/* Allocate memory and create the SOB char: " (string (cadar consts-list)) " */\n"
@@ -1266,7 +1260,7 @@
 					"\tCALL(MAKE_SOB_CHAR);\n"
 					"\tDROP(IMM(1));\n"
 					(create-consts-table (cdr consts-list))
-					))
+				))
 			((eq? 'string (caar consts-list))
 				(string-append
 					"\t/* Allocate memory and create the SOB string: \"" (cadar consts-list) "\" */\n"
@@ -1275,9 +1269,26 @@
 					"\tCALL(MAKE_SOB_STRING);\n"
 					"\tDROP(IMM(" (number->string (+ 1 (string-length (cadar consts-list)))) "));\n"
 					(create-consts-table (cdr consts-list))
-					))	
-			)
-		))
+				))
+			((eq? 'vector (caar consts-list))
+				(string-append
+					;"\t/* Allocate memory and create the SOB vector: \"" (list->string (vector->list (cadar consts-list))) "\" */\n"
+					(cg-vector-elements (cadar consts-list) (- (vector-length (cadar consts-list)) 1))
+					"\tPUSH(IMM(" (number->string (vector-length (cadar consts-list))) "));\n"
+					"\tCALL(MAKE_SOB_VECTOR);\n"
+					"\tDROP(IMM(" (number->string (+ 1 (vector-length (cadar consts-list)))) "));\n"
+					(create-consts-table (cdr consts-list))
+				))
+			((eq? 'pair (caar consts-list))
+				(string-append
+					;"\t/* Allocate memory and create the SOB pair: \"" (list->string (cadar consts-list)) "\" */\n"
+					"\tPUSH(" (number->string (get-const-address (car (cadar consts-list)) global-const-address)) ");\n"	
+					"\tPUSH(" (number->string (get-const-address (cdr (cadar consts-list)) global-const-address)) ");\n"							
+					"\tCALL(MAKE_SOB_PAIR);\n"
+					"\tDROP(IMM(2));\n"
+					(create-consts-table (cdr consts-list))
+				))
+			)))
 
 (define cg-string-to-chars
 	(lambda (str index)
@@ -1287,39 +1298,90 @@
 				(cg-string-to-chars str (- index 1))
 				"\tPUSH(" (number->string (char->integer (string-ref str index))) ");\n"			
 				))))
-		
 
+(define cg-vector-elements
+	(lambda (vec index)
+		(if (eq? index -1)
+			""
+			(string-append
+				(cg-vector-elements vec (- index 1))
+				"\tPUSH(" (number->string (get-const-address (vector-ref vec index) global-const-address)) ");\n"			
+				))))				
+	
+;;;;;;;; gets the code and returns list of consts, its type and its address
 (define get-consts 
 	(lambda (code)
-          (tag-types (get-consts-list code '()) '() 16)))
+          (tag-types (remove-dup-consts (get-consts-list code '()) '()) '() 16)))
 
+;;;; gets a code and return a flat list of the consts in the code
 (define get-consts-list 
 	(lambda (code ans)
 		(cond 
 			((or (null? code) (not (list? code))) ans)					; end of exp
 			((pe-const? code) 											; single const exp
-				(if (or (member? (cadr code) ans) (boolean? (cadr code))) 
-						ans ;in case value is duplicate or boolean - don't insert to ans
+				(if (or (pair? (cadr code)) (vector? (cadr code))) 
+						(append ans (topological-sort (cadr code)))
 						(append ans (cdr code))))
             (else (get-consts-list (cdr code) (get-consts-list (car code) ans)))
         )))
 
+;;;; gets a const list, identify the consts types, and returns a tagged consts list
 (define tag-types 
 	(lambda (const-lst ans index)
 		(cond 
 			((null? const-lst) ans)
-			((number? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 
-			'integer (car const-lst) index))) (+ index 2)))					
-			((char? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 
-			'char (car const-lst) index))) (+ index 2)))	
-			((string? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 
-			'string (car const-lst) index))) (+ index (+ 2 (string-length (car const-lst))))))	
+			((number? (car const-lst)) 
+				(tag-types 
+					(cdr const-lst) 
+					(append ans (list (list 'integer (car const-lst) index))) 
+					(+ index 2)))					
+			((char? (car const-lst)) 
+				(tag-types 
+					(cdr const-lst) 
+					(append ans (list (list 'char (car const-lst) index))) 
+					(+ index 2)))	
+			((string? (car const-lst)) 
+				(tag-types 
+					(cdr const-lst) 
+					(append ans (list (list 'string (car const-lst) index))) 
+					(+ index (+ 2 (string-length (car const-lst))))))
+			((vector? (car const-lst)) 
+				(tag-types 
+					(cdr const-lst) 
+					(append ans (list (list 'vector (car const-lst) index))) 
+					(+ index (+ 2 (vector-length (car const-lst))))))
+			((pair? (car const-lst))
+				(tag-types 
+					(cdr const-lst)
+					(append ans (list (list 'pair (car const-lst) index)))
+					(+ index 3)))
 			
 			;TODO - check other types
 			; ((symbol? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 
 			; 'symbol (car const-lst) index))) (+ index 1)))
-			((pair? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 'pair (car const-lst) index)) (+ index 3))))			
-			((vector? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 'vector (car const-lst) index)) (+ index (+ 2 (vector-length (car const-lst)))))))
+		)))
+
+		
+;;;;; remove booleans & duplications
+(define remove-dup-consts
+	(lambda (const-list ans)
+		(cond
+			((null? const-list) ans)
+			((or (boolean? (car const-list)) (member? (car const-list) ans))
+				(remove-dup-consts (cdr const-list) ans))
+			(else
+				(remove-dup-consts (cdr const-list) (append ans (list (car const-list)))))
+		)))
+		
+;;;;; topological sort function - gets an expression and sorts its sub-expressions before the root expression
+(define topological-sort
+	(lambda (e)
+		(cond 
+			((pair? e)
+				`(,@(topological-sort (car e)) ,@(topological-sort (cdr e)) ,e))
+			((vector? e)
+				`(,@(apply append (map topological-sort (vector->list e))) ,e))
+			(else `(,e))
 		)))
 		
 ; assuming every constant will be found in global-const-address
@@ -1329,7 +1391,7 @@
 (define get-const-address
 	(lambda (c consts-list)
 		(cond 
-			((boolean? c) 0) ;address is hard-coded in boolean, therefore return value is fake
+			((boolean? c) (if c 14 12)) ;address is hard-coded in boolean, therefore return value is the hard coded address
 			((eq? c (cadar consts-list)) (caddar consts-list)) ;found const! return address
 			(else (get-const-address c (cdr consts-list))) ; keep searching			
 		)))
@@ -1375,8 +1437,8 @@
 (define compile-scheme-file
 	(lambda (inputFileName outputFileName)
 		(let (	(output (open-output-file outputFileName 'replace))			
-				(input (car (map annotate-tc (map pe->lex-pe (map parse (tokens->sexprs (list->tokens 
-				(file->list inputFileName))))))))    ) ;;;;add anotate-tc
+				(input (car (map pe->lex-pe (map parse (tokens->sexprs (list->tokens 
+				(file->list inputFileName)))))))    ) ;;;;add anotate-tc
 			(set! global-const-address (get-consts input))
 			(display 
 				(string-append
@@ -1467,7 +1529,7 @@ CONTINUE:
 
 	/* code generation */
 	"
-	(code-gen input 0)	
+	;(code-gen input 0)	
 	"
 END:
 	PUSH(R0);

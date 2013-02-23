@@ -1,2 +1,1 @@
-((lambda(x) (x #t)) 
-	(lambda (n) (if n #t #f)))
+(if #t '(5 . 3) #f)
