@@ -1235,7 +1235,7 @@
 			#f)))
 
 			
-;;;;;;;;;; constants handle functions ;;;;;;;;;
+;;;;;;;;;; constants handling functions ;;;;;;;;;
 
 (define create-consts-table
 	(lambda (consts-list)
@@ -1288,6 +1288,12 @@
 					"\tDROP(IMM(2));\n"
 					(create-consts-table (cdr consts-list))
 				))
+			((eq? 'symbol (caar consts-list))
+				(string-append
+					"\t/* Allocate memory and create the SOB symbol: \"" (symbol->string (cadar consts-list)) "\" */\n"						
+					"\tCALL(MAKE_SOB_SYMBOL);\n"
+					(create-consts-table (cdr consts-list))
+				))				
 			)))
 
 (define cg-string-to-chars
@@ -1317,11 +1323,13 @@
 (define get-consts-list 
 	(lambda (code ans)
 		(cond 
-			((or (null? code) (not (list? code))) ans)					; end of exp
-			((pe-const? code) 											; single const exp
-				(if (or (pair? (cadr code)) (vector? (cadr code))) 
-						(append ans (topological-sort (cadr code)))
-						(append ans (cdr code))))
+			((or (null? code) (not (list? code))) ans)									; end of exp
+			((and (pe-const? code) (or (pair? (cadr code)) (vector? (cadr code)) (symbol? (cadr code))))		; pair or vector - insert elements
+				(append ans (topological-sort (cadr code))))
+			((pe-fvar? code)			; symbol - insert as string
+				(append ans (topological-sort (cadr code))))
+			((pe-const? code) 															; single const exp
+				(append ans (cdr code)))
             (else (get-consts-list (cdr code) (get-consts-list (car code) ans)))
         )))
 
@@ -1329,7 +1337,9 @@
 (define tag-types 
 	(lambda (const-lst ans index)
 		(cond 
-			((null? const-lst) ans)
+			((null? const-lst) 
+				(set! initial-buckets-address index)
+				ans)
 			((number? (car const-lst)) 
 				(tag-types 
 					(cdr const-lst) 
@@ -1355,10 +1365,11 @@
 					(cdr const-lst)
 					(append ans (list (list 'pair (car const-lst) index)))
 					(+ index 3)))
-			
-			;TODO - check other types
-			; ((symbol? (car const-lst)) (tag-types (cdr const-lst) (append ans (list (list 
-			; 'symbol (car const-lst) index))) (+ index 1)))
+			((symbol? (car const-lst))
+				(tag-types 
+					(cdr const-lst)
+					(append ans (list (list 'symbol (car const-lst) index)))
+					(+ index 2)))		
 		)))
 
 		
@@ -1379,6 +1390,8 @@
 		(cond 
 			((pair? e)
 				`(,@(topological-sort (car e)) ,@(topological-sort (cdr e)) ,e))
+			((symbol? e)
+				`(,(symbol->string e) ,e))
 			((vector? e)
 				`(,@(apply append (map topological-sort (vector->list e))) ,e))
 			(else `(,e))
@@ -1401,6 +1414,21 @@
 ; ( type-tag . value . address in memory ) 
 ; This list is set in the main function compile-scheme-file		
 (define global-const-address '())
+
+
+
+;;;;;;;;;; symbols handling functions ;;;;;;;;;
+
+(define create-symbol-table
+	(lambda (next-buckets-address)
+	
+	))
+		
+
+
+	
+(define initial-buckets-address 16)
+
 		
 ;;;;;;;;;; unique tagging ;;;;;;;;;;;
 		
@@ -1514,7 +1542,8 @@ CONTINUE:
 	/* create symbol table based on constants */
 	"
 	
-	(create-consts-table (get-consts input))	
+	(create-consts-table global-const-address)
+	(create-symbol-table initial-buckets-address)
 	
 	"
 	
@@ -1529,7 +1558,7 @@ CONTINUE:
 
 	/* code generation */
 	"
-	;(code-gen input 0)	
+	(code-gen input 0)	
 	"
 END:
 	PUSH(R0);
