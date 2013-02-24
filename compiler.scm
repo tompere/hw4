@@ -1283,7 +1283,7 @@
 				(string-append
 					;"\t/* Allocate memory and create the SOB pair: \"" (list->string (cadar consts-list)) "\" */\n"
 					"\tPUSH(" (number->string (get-const-address (car (cadar consts-list)) global-const-address)) ");\n"	
-					"\tPUSH(" (number->string (get-const-address (cdr (cadar consts-list)) global-const-address)) ");\n"							
+					"\tPUSH(" (number->string (get-const-address (cadr (cadar consts-list)) global-const-address)) ");\n"							
 					"\tCALL(MAKE_SOB_PAIR);\n"
 					"\tDROP(IMM(2));\n"
 					(create-consts-table (cdr consts-list))
@@ -1291,7 +1291,11 @@
 			((eq? 'symbol (caar consts-list))
 				(string-append
 					"\t/* Allocate memory and create the SOB symbol: \"" (symbol->string (cadar consts-list)) "\" */\n"						
-					"\tCALL(MAKE_SOB_SYMBOL);\n"
+					"\tPUSH(IMM(2));\n"
+					"\tCALL(MALLOC);\n"
+					"\tDROP(1);\n"
+					"\tMOV(IND(R0), T_SYMBOL);\n"
+					"\tMOV(INDD(R0,1), IMM(0));\n"
 					(create-consts-table (cdr consts-list))
 				))				
 			)))
@@ -1420,8 +1424,18 @@
 ;;;;;;;;;; symbols handling functions ;;;;;;;;;
 
 (define create-symbol-table
-	(lambda (next-buckets-address)
-	
+	(lambda (next-buckets-address const-list)
+		(if (null? const-list)
+			""
+			(string-append
+				"\tPUSH(IMM(3));\n"
+				"\tCALL(MALLOC);\n"
+				"\tMOV(IND(" (number->string (+ (caddar const-list) 1)) "),R0);\n"
+				"\tMOV(IND(R0)," (number->string (get-const-address (symbol->string (cadar const-list)) global-const-address)) ");\n"
+				"\tMOV(INDD(R0,1)," (number->string (if (null? (cdr const-list)) 0 next-bucket-address)) ");\n"
+				"\tMOV(INDD(R0,2),IMM(0));\n"
+				(create-symbol-table (+ 3 next-buckets-address) (cdr const-list))
+			))
 	))
 		
 
@@ -1515,8 +1529,7 @@ int main()
 	#include \"system.lib\"
 	
 	"
-
-	(error-code)
+	;(error-code)
 "
 CONTINUE:
 	
@@ -1543,7 +1556,7 @@ CONTINUE:
 	"
 	
 	(create-consts-table global-const-address)
-	(create-symbol-table initial-buckets-address)
+	(create-symbol-table (+ 3 initial-buckets-address) (filter (lambda (e) (equal? (car e) 'symbol)) global-const-address))
 	
 	"
 	
@@ -1558,7 +1571,7 @@ CONTINUE:
 
 	/* code generation */
 	"
-	(code-gen input 0)	
+	;(code-gen input 0)	
 	"
 END:
 	PUSH(R0);
