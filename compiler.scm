@@ -893,19 +893,22 @@
 	
 (define cg-fvar
 	(lambda (pe)
-		(string-append
-			"\t/* fvar_" (symbol->string (car pe)) " */\n"
-			"\tMOV(R0," (number->string (get-const-address (car pe) global-const-address))  ");\n"
-			"\tMOV(R0,INDD(R0,1));\n"
-			"\tMOV(R0,INDD(R0,2));\n"
-			"\tCMP(R0,IMM(0));\n"
-			"\tJUMP_EQ(ERROR_UNDEFINED_VAR_PRE);\n"
-			"\tJUMP(NO_ERROR_UNDEFINED);\n"
-			"\tERROR_UNDEFINED_VAR_PRE:\n"
-			"\tMOV(R1," (number->string (get-const-address (symbol->string (car pe)) global-const-address)) ");\n"
-			"\tJUMP(ERROR_UNDEFINED_VAR);\n"
-			"\tNO_ERROR_UNDEFINED:\n"
-			)))
+		(set-unique-tag)
+		(let 
+			( (unique-tag (number->string current-unique-tag)) )
+			(string-append
+				"\t/* fvar_" (symbol->string (car pe)) " */\n"
+				"\tMOV(R0," (number->string (get-const-address (car pe) global-const-address))  ");\n"
+				"\tMOV(R0,INDD(R0,1));\n"
+				"\tMOV(R0,INDD(R0,2));\n"
+				"\tCMP(R0,IMM(0));\n"
+				"\tJUMP_EQ(ERROR_UNDEFINED_VAR_PRE_" unique-tag ");\n"
+				"\tJUMP(NO_ERROR_UNDEFINED_" unique-tag ");\n"
+				"\tERROR_UNDEFINED_VAR_PRE_" unique-tag ":\n"
+				"\tMOV(R1," (number->string (get-const-address (symbol->string (car pe)) global-const-address)) ");\n"
+				"\tJUMP(ERROR_UNDEFINED_VAR);\n"
+				"\tNO_ERROR_UNDEFINED_" unique-tag ":\n"
+		))))
 
 (define cg-lambda-simple
 	(lambda (pe env)
@@ -1308,8 +1311,8 @@
 			((eq? 'pair (caar consts-list))
 				(string-append
 					;"\t/* Allocate memory and create the SOB pair: \"" (list->string (cadar consts-list)) "\" */\n"
-					"\tPUSH(" (number->string (get-const-address (car (cadar consts-list)) global-const-address)) ");\n"	
-					"\tPUSH(" (number->string (get-const-address (cadr (cadar consts-list)) global-const-address)) ");\n"							
+					"\tPUSH(" (number->string (if (null? (cdadar consts-list)) 11 (get-const-address (cdadar consts-list) global-const-address))) ");\n"
+					"\tPUSH(" (number->string (get-const-address (car (cadar consts-list)) global-const-address)) ");\n"						
 					"\tCALL(MAKE_SOB_PAIR);\n"
 					"\tDROP(IMM(2));\n"
 					(create-consts-table (cdr consts-list))
@@ -1408,7 +1411,8 @@
 	(lambda (const-list ans)
 		(cond
 			((null? const-list) ans)
-			((or 	(boolean? (car const-list)) 
+			((or 	(boolean? (car const-list))
+					(null? (car const-list))
 					((lambda (e listof) 
 						(if (list? (member e listof)) ; check if e exists in listof 
 							#t

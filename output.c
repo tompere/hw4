@@ -138,27 +138,71 @@ CONTINUE:
 ;
 	
 	/* create constants table*/
-		/* Allocate memory and create the SOB string: "x" */
-	PUSH(120);
+		/* Allocate memory and create the SOB string: "a" */
+	PUSH(97);
 	PUSH(IMM(1));
 	CALL(MAKE_SOB_STRING);
 	DROP(IMM(2));
-	/* Allocate memory and create the SOB symbol: "x" */
+	/* Allocate memory and create the SOB symbol: "a" */
 	PUSH(IMM(2));
 	CALL(MALLOC);
 	DROP(1);
 	MOV(IND(R0), T_SYMBOL);
 	MOV(INDD(R0,1), IMM(0));
-	/* Allocate memory and create the SOB integer: 5 */
-	PUSH(IMM(5));
-	CALL(MAKE_SOB_INTEGER);
-	DROP(IMM(1));
-MOV(IND(1),23);
-	/* Create bucket for symbol : x */
+	/* Allocate memory and create the SOB string: "b" */
+	PUSH(98);
+	PUSH(IMM(1));
+	CALL(MAKE_SOB_STRING);
+	DROP(IMM(2));
+	/* Allocate memory and create the SOB symbol: "b" */
+	PUSH(IMM(2));
+	CALL(MALLOC);
+	DROP(1);
+	MOV(IND(R0), T_SYMBOL);
+	MOV(INDD(R0,1), IMM(0));
+	/* Allocate memory and create the SOB string: "c" */
+	PUSH(99);
+	PUSH(IMM(1));
+	CALL(MAKE_SOB_STRING);
+	DROP(IMM(2));
+	/* Allocate memory and create the SOB symbol: "c" */
+	PUSH(IMM(2));
+	CALL(MALLOC);
+	DROP(1);
+	MOV(IND(R0), T_SYMBOL);
+	MOV(INDD(R0,1), IMM(0));
+	PUSH(11);
+	PUSH(29);
+	CALL(MAKE_SOB_PAIR);
+	DROP(IMM(2));
+	PUSH(31);
+	PUSH(24);
+	CALL(MAKE_SOB_PAIR);
+	DROP(IMM(2));
+	PUSH(34);
+	PUSH(19);
+	CALL(MAKE_SOB_PAIR);
+	DROP(IMM(2));
+MOV(IND(1),40);
+	/* Create bucket for symbol : a */
 	PUSH(IMM(3));
 	CALL(MALLOC);
 	MOV(IND(20),R0);
 	MOV(IND(R0),16);
+	MOV(INDD(R0,1),43);
+	MOV(INDD(R0,2),IMM(0));
+	/* Create bucket for symbol : b */
+	PUSH(IMM(3));
+	CALL(MALLOC);
+	MOV(IND(25),R0);
+	MOV(IND(R0),21);
+	MOV(INDD(R0,1),46);
+	MOV(INDD(R0,2),IMM(0));
+	/* Create bucket for symbol : c */
+	PUSH(IMM(3));
+	CALL(MALLOC);
+	MOV(IND(30),R0);
+	MOV(IND(R0),26);
 	MOV(INDD(R0,1),0);
 	MOV(INDD(R0,2),IMM(0));
 
@@ -172,48 +216,7 @@ MOV(IND(1),23);
 	MOV(FP,SP);
 
 	/* code generation */
-		/* BEGIN_SEQ_3342061 */
-	/* seq_3342061 | expression i */
-	MOV(R0,IMM(21));
-	MOV(R1,19);
-	MOV(R1,INDD(R1,1));
-	MOV(INDD(R1,2),R0);
-	MOV(R0,IMM(10));
-	/* seq_3342061 | expression i */
-	/* Test if_3342062 */
-	MOV(R0, IMM(14));
-	CMP(INDD(R0,1),IMM(0));
-	JUMP_EQ(DIF_LABEL_3342062);
-	/* Do-if-true if_3342062 */
-	/* BEGIN_OR_3342063 */
-	/* or_3342063 | Test expression i */
-	MOV(R0, IMM(12));
-	CMP(INDD(R0,1),IMM(0));
-	JUMP_NE(END_OR_3342063);
-	/* or_3342063 | Test expression i */
-	MOV(R0, IMM(12));
-	CMP(INDD(R0,1),IMM(0));
-	JUMP_NE(END_OR_3342063);
-	/* or_3342063 | Test expression i */
-	/* fvar_x */
-	MOV(R0,19);
-	MOV(R0,INDD(R0,1));
-	MOV(R0,INDD(R0,2));
-	CMP(R0,IMM(0));
-	JUMP_EQ(ERROR_UNDEFINED_VAR_PRE);
-	JUMP(NO_ERROR_UNDEFINED);
-	ERROR_UNDEFINED_VAR_PRE:
-	MOV(R1,16);
-	JUMP(ERROR_UNDEFINED_VAR);
-	NO_ERROR_UNDEFINED:
-	CMP(INDD(R0,1),IMM(0));
-	JUMP_NE(END_OR_3342063);
-	END_OR_3342063:
-	JUMP(END_IF_3342062);
-	DIF_LABEL_3342062:
-	/* Do-if-false if_3342062 */
-	MOV(R0, IMM(14));
-	END_IF_3342062:
+		MOV(R0,IMM(37));
 
 END:
 	PUSH(R0);
