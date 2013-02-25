@@ -29,6 +29,7 @@
 #include "lib/scheme/write_sob_closure.asm"
 #include "lib/scheme/write_sob_string.asm"
 #include "lib/scheme/write_sob_vector.asm"
+#include "lib/scheme/write_sob_symbol.asm"
 #include "lib/scheme/write_sob.asm"
 
 {
