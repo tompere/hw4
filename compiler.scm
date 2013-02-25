@@ -746,7 +746,8 @@
 	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;; Assignment 4 ;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;
 
 ;;; Code Generator
 ;;; Purpose: turns the scheme code into a pseudo-assembly code
@@ -763,11 +764,13 @@
 			((pe-seq? pe) (cg-seq (cadr pe) env))
 			((pe-pvar? pe) (cg-pvar (cdr pe)))
 			((pe-bvar? pe) (cg-bvar (cdr pe)))
+			((pe-fvar? pe) (cg-fvar (cdr pe)))
 			((pe-lambda-simple? pe) (cg-lambda-simple (cdr pe) env))
 			((pe-lambda-opt? pe) (cg-lambda-opt (cdr pe) env))
 			((pe-lambda-variadic? pe) (cg-lambda-variadic (cdr pe) env))
 			((pe-applic? pe) (cg-applic (cdr pe) env))
 			((pe-tc-applic? pe) (cg-tc-applic (cdr pe) env))
+			((pe-define? pe) (cg-define (cdr pe) env))
 			(else "")
 			)))
 			
@@ -887,6 +890,22 @@
 			"\tMOV(R0,INDD(R0," (number->string (cadr pe)) "));\n"
 			"\tMOV(R0,INDD(R0," (number->string (caddr pe)) "));\n")
 	))
+	
+(define cg-fvar
+	(lambda (pe)
+		(string-append
+			"\t/* fvar_" (symbol->string (car pe)) " */\n"
+			"\tMOV(R0," (number->string (get-const-address (car pe) global-const-address))  ");\n"
+			"\tMOV(R0,INDD(R0,1));\n"
+			"\tMOV(R0,INDD(R0,2));\n"
+			"\tCMP(R0,IMM(0));\n"
+			"\tJUMP_EQ(ERROR_UNDEFINED_VAR_PRE);\n"
+			"\tJUMP(NO_ERROR_UNDEFINED);\n"
+			"\tERROR_UNDEFINED_VAR_PRE:\n"
+			"\tMOV(R1," (number->string (get-const-address (symbol->string (car pe)) global-const-address)) ");\n"
+			"\tJUMP(ERROR_UNDEFINED_VAR);\n"
+			"\tNO_ERROR_UNDEFINED:\n"
+			)))
 
 (define cg-lambda-simple
 	(lambda (pe env)
@@ -1168,16 +1187,19 @@
 				
 				"\tJUMPA(INDD(R0,2));\n"
 			))))
-				
-
-
-; (define cg-fvar
-	; (lambda (pe env)
-		; (cond
-			; ((is-premitive? (car pe)) )
-			; )))
-
 			
+			
+(define cg-define
+	(lambda (pe env)
+		(string-append
+			(code-gen (cadr pe) env)
+			"\tMOV(R1," (number->string (get-const-address (cadar pe) global-const-address))  ");\n"
+			"\tMOV(R1,INDD(R1,1));\n"
+			"\tMOV(INDD(R1,2),R0);\n"
+			"\tMOV(R0,IMM(10));\n"
+			)
+		))
+
 ;;;;;;;;;; isType? functions ;;;;;;;;;
 
 (define pe-const?
@@ -1228,11 +1250,15 @@
 	(lambda (pe)
 		(if (eq? (car pe) 'fvar) #t #f)))
 		
-(define is-premitive?
+; (define is-premitive?
+	; (lambda (pe)
+		; (if (or (eq? pe '+) (eq? pe '-) (eq? pe '*) (eq? pe '/))
+			; #t
+			; #f)))
+
+(define pe-define?
 	(lambda (pe)
-		(if (or (eq? pe '+) (eq? pe '-) (eq? pe '*) (eq? pe '/))
-			#t
-			#f)))
+		(if (eq? (car pe) 'define) #t #f)))
 
 			
 ;;;;;;;;;; constants handling functions ;;;;;;;;;
@@ -1382,7 +1408,11 @@
 	(lambda (const-list ans)
 		(cond
 			((null? const-list) ans)
-			((or (boolean? (car const-list)) (member? (car const-list) ans))
+			((or 	(boolean? (car const-list)) 
+					((lambda (e listof) 
+						(if (list? (member e listof)) ; check if e exists in listof 
+							#t
+							#f)) (car const-list) ans))
 				(remove-dup-consts (cdr const-list) ans))
 			(else
 				(remove-dup-consts (cdr const-list) (append ans (list (car const-list)))))
@@ -1409,7 +1439,7 @@
 	(lambda (c consts-list)
 		(cond 
 			((boolean? c) (if c 14 12)) ;address is hard-coded in boolean, therefore return value is the hard coded address
-			((eq? c (cadar consts-list)) (caddar consts-list)) ;found const! return address
+			((equal? c (cadar consts-list)) (caddar consts-list)) ;found const! return address
 			(else (get-const-address c (cdr consts-list))) ; keep searching			
 		)))
 		
@@ -1433,7 +1463,7 @@
 				"\tCALL(MALLOC);\n"
 				"\tMOV(IND(" (number->string (+ (caddar const-list) 1)) "),R0);\n"
 				"\tMOV(IND(R0)," (number->string (get-const-address (symbol->string (cadar const-list)) global-const-address)) ");\n"
-				"\tMOV(INDD(R0,1)," (number->string (if (null? (cdr const-list)) 0 next-bucket-address)) ");\n"
+				"\tMOV(INDD(R0,1)," (number->string (if (null? (cdr const-list)) 0 next-buckets-address)) ");\n"
 				"\tMOV(INDD(R0,2),IMM(0));\n"
 				(create-symbol-table (+ 3 next-buckets-address) (cdr const-list))
 			))
@@ -1464,6 +1494,25 @@
 			"\tPUSH(IMM(19));\n"
 			"\tCALL(MAKE_SOB_STRING);\n"
 			"\tDROP(IMM(20));\n"
+			"\tPUSH(R0);\n"
+			"\tCALL(WRITE_SOB_STRING);\n"
+			"return 1;"
+			"\t/* error_undefined-variable */\n"
+			"ERROR_UNDEFINED_VAR:\n"
+			(cg-string-to-chars "Error: variable " 15)
+			"\tPUSH(IMM(16));\n"
+			"\tCALL(MAKE_SOB_STRING);\n"
+			"\tDROP(IMM(17));\n"
+			"\tPUSH(R0);\n"
+			"\tCALL(WRITE_SOB_STRING);\n"
+			"\tDROP(IMM(1));\n"
+			"\tPUSH(R1);\n"
+			"\tCALL(WRITE_SOB);\n"
+			"\tDROP(IMM(1));\n"
+			(cg-string-to-chars " is undefined." 13)
+			"\tPUSH(IMM(14));\n"
+			"\tCALL(MAKE_SOB_STRING);\n"
+			"\tDROP(IMM(15));\n"
 			"\tPUSH(R0);\n"
 			"\tCALL(WRITE_SOB_STRING);\n"
 			"return 1;"
@@ -1557,12 +1606,14 @@ CONTINUE:
 	"
 	
 	(create-consts-table global-const-address)
+	
+	"MOV(IND(1)," (number->string initial-buckets-address) ");\n" ;set address for begining of symbol table
+	
 	(create-symbol-table 
 		(+ 3 initial-buckets-address) ; next address
 		(filter (lambda (e) (equal? (car e) 'symbol)) global-const-address)) ;filtered consts list (only symbols!)
 	
 	"
-	
 	/* END of initialization */
 	
 	/* Fake Env */

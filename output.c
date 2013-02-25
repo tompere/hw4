@@ -68,6 +68,52 @@ ERROR_NST:
 	DROP(IMM(20));
 	PUSH(R0);
 	CALL(WRITE_SOB_STRING);
+return 1;	/* error_undefined-variable */
+ERROR_UNDEFINED_VAR:
+	PUSH(69);
+	PUSH(114);
+	PUSH(114);
+	PUSH(111);
+	PUSH(114);
+	PUSH(58);
+	PUSH(32);
+	PUSH(118);
+	PUSH(97);
+	PUSH(114);
+	PUSH(105);
+	PUSH(97);
+	PUSH(98);
+	PUSH(108);
+	PUSH(101);
+	PUSH(32);
+	PUSH(IMM(16));
+	CALL(MAKE_SOB_STRING);
+	DROP(IMM(17));
+	PUSH(R0);
+	CALL(WRITE_SOB_STRING);
+	DROP(IMM(1));
+	PUSH(R1);
+	CALL(WRITE_SOB);
+	DROP(IMM(1));
+	PUSH(32);
+	PUSH(105);
+	PUSH(115);
+	PUSH(32);
+	PUSH(117);
+	PUSH(110);
+	PUSH(100);
+	PUSH(101);
+	PUSH(102);
+	PUSH(105);
+	PUSH(110);
+	PUSH(101);
+	PUSH(100);
+	PUSH(46);
+	PUSH(IMM(14));
+	CALL(MAKE_SOB_STRING);
+	DROP(IMM(15));
+	PUSH(R0);
+	CALL(WRITE_SOB_STRING);
 return 1;
 CONTINUE:
 	
@@ -91,36 +137,31 @@ CONTINUE:
 	ADD(ADDR(0), IMM(15))
 ;
 	
-	/* create symbol table based on constants */
-		/* Allocate memory and create the SOB string: "abc" */
-	PUSH(97);
-	PUSH(98);
-	PUSH(99);
-	PUSH(IMM(3));
+	/* create constants table*/
+		/* Allocate memory and create the SOB string: "x" */
+	PUSH(120);
+	PUSH(IMM(1));
 	CALL(MAKE_SOB_STRING);
-	DROP(IMM(4));
-	/* Allocate memory and create the SOB symbol: "abc" */
+	DROP(IMM(2));
+	/* Allocate memory and create the SOB symbol: "x" */
 	PUSH(IMM(2));
 	CALL(MALLOC);
 	DROP(1);
 	MOV(IND(R0), T_SYMBOL);
 	MOV(INDD(R0,1), IMM(0));
-	/* Allocate memory and create the SOB string: "tom" */
-	PUSH(116);
-	PUSH(111);
-	PUSH(109);
-	PUSH(IMM(3));
-	CALL(MAKE_SOB_STRING);
-	DROP(IMM(4));
-	/* Create bucket for symbol : abc */
+	/* Allocate memory and create the SOB integer: 5 */
+	PUSH(IMM(5));
+	CALL(MAKE_SOB_INTEGER);
+	DROP(IMM(1));
+MOV(IND(1),23);
+	/* Create bucket for symbol : x */
 	PUSH(IMM(3));
 	CALL(MALLOC);
-	MOV(IND(22),R0);
+	MOV(IND(20),R0);
 	MOV(IND(R0),16);
 	MOV(INDD(R0,1),0);
 	MOV(INDD(R0,2),IMM(0));
 
-	
 	/* END of initialization */
 	
 	/* Fake Env */
@@ -131,17 +172,48 @@ CONTINUE:
 	MOV(FP,SP);
 
 	/* code generation */
-		/* Test if_3342061 */
+		/* BEGIN_SEQ_3342061 */
+	/* seq_3342061 | expression i */
+	MOV(R0,IMM(21));
+	MOV(R1,19);
+	MOV(R1,INDD(R1,1));
+	MOV(INDD(R1,2),R0);
+	MOV(R0,IMM(10));
+	/* seq_3342061 | expression i */
+	/* Test if_3342062 */
 	MOV(R0, IMM(14));
 	CMP(INDD(R0,1),IMM(0));
-	JUMP_EQ(DIF_LABEL_3342061);
-	/* Do-if-true if_3342061 */
-	MOV(R0,IMM(21));
-	JUMP(END_IF_3342061);
-	DIF_LABEL_3342061:
-	/* Do-if-false if_3342061 */
-	MOV(R0,IMM(23));
-	END_IF_3342061:
+	JUMP_EQ(DIF_LABEL_3342062);
+	/* Do-if-true if_3342062 */
+	/* BEGIN_OR_3342063 */
+	/* or_3342063 | Test expression i */
+	MOV(R0, IMM(12));
+	CMP(INDD(R0,1),IMM(0));
+	JUMP_NE(END_OR_3342063);
+	/* or_3342063 | Test expression i */
+	MOV(R0, IMM(12));
+	CMP(INDD(R0,1),IMM(0));
+	JUMP_NE(END_OR_3342063);
+	/* or_3342063 | Test expression i */
+	/* fvar_x */
+	MOV(R0,19);
+	MOV(R0,INDD(R0,1));
+	MOV(R0,INDD(R0,2));
+	CMP(R0,IMM(0));
+	JUMP_EQ(ERROR_UNDEFINED_VAR_PRE);
+	JUMP(NO_ERROR_UNDEFINED);
+	ERROR_UNDEFINED_VAR_PRE:
+	MOV(R1,16);
+	JUMP(ERROR_UNDEFINED_VAR);
+	NO_ERROR_UNDEFINED:
+	CMP(INDD(R0,1),IMM(0));
+	JUMP_NE(END_OR_3342063);
+	END_OR_3342063:
+	JUMP(END_IF_3342062);
+	DIF_LABEL_3342062:
+	/* Do-if-false if_3342062 */
+	MOV(R0, IMM(14));
+	END_IF_3342062:
 
 END:
 	PUSH(R0);
