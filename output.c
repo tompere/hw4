@@ -41,6 +41,7 @@ int main()
 	#include "math.lib"
 	#include "string.lib"
 	#include "system.lib"
+	#include "primitives.lib"
 	
 		/* error_no-such-type */
 ERROR_NST:
@@ -138,73 +139,45 @@ CONTINUE:
 ;
 	
 	/* create constants table*/
-		/* Allocate memory and create the SOB string: "a" */
-	PUSH(97);
-	PUSH(IMM(1));
+		/* Allocate memory and create the SOB string: "string?" */
+	PUSH(115);
+	PUSH(116);
+	PUSH(114);
+	PUSH(105);
+	PUSH(110);
+	PUSH(103);
+	PUSH(63);
+	PUSH(IMM(7));
 	CALL(MAKE_SOB_STRING);
-	DROP(IMM(2));
-	/* Allocate memory and create the SOB symbol: "a" */
+	DROP(IMM(8));
+	/* Allocate memory and create the SOB symbol: "string?" */
 	PUSH(IMM(2));
 	CALL(MALLOC);
 	DROP(1);
 	MOV(IND(R0), T_SYMBOL);
 	MOV(INDD(R0,1), IMM(0));
-	/* Allocate memory and create the SOB string: "b" */
-	PUSH(98);
-	PUSH(IMM(1));
-	CALL(MAKE_SOB_STRING);
-	DROP(IMM(2));
-	/* Allocate memory and create the SOB symbol: "b" */
-	PUSH(IMM(2));
-	CALL(MALLOC);
-	DROP(1);
-	MOV(IND(R0), T_SYMBOL);
-	MOV(INDD(R0,1), IMM(0));
-	/* Allocate memory and create the SOB string: "c" */
-	PUSH(99);
-	PUSH(IMM(1));
-	CALL(MAKE_SOB_STRING);
-	DROP(IMM(2));
-	/* Allocate memory and create the SOB symbol: "c" */
-	PUSH(IMM(2));
-	CALL(MALLOC);
-	DROP(1);
-	MOV(IND(R0), T_SYMBOL);
-	MOV(INDD(R0,1), IMM(0));
-	PUSH(11);
-	PUSH(29);
-	CALL(MAKE_SOB_PAIR);
-	DROP(IMM(2));
-	PUSH(31);
-	PUSH(24);
-	CALL(MAKE_SOB_PAIR);
-	DROP(IMM(2));
-	PUSH(34);
-	PUSH(19);
-	CALL(MAKE_SOB_PAIR);
-	DROP(IMM(2));
-MOV(IND(1),40);
-	/* Create bucket for symbol : a */
+	/* Allocate memory and create the SOB integer: 5 */
+	PUSH(IMM(5));
+	CALL(MAKE_SOB_INTEGER);
+	DROP(IMM(1));
+MOV(IND(1),29);
+	/* Create bucket for symbol : string? */
 	PUSH(IMM(3));
 	CALL(MALLOC);
-	MOV(IND(20),R0);
+	MOV(IND(26),R0);
 	MOV(IND(R0),16);
-	MOV(INDD(R0,1),43);
-	MOV(INDD(R0,2),IMM(0));
-	/* Create bucket for symbol : b */
-	PUSH(IMM(3));
-	CALL(MALLOC);
-	MOV(IND(25),R0);
-	MOV(IND(R0),21);
-	MOV(INDD(R0,1),46);
-	MOV(INDD(R0,2),IMM(0));
-	/* Create bucket for symbol : c */
-	PUSH(IMM(3));
-	CALL(MALLOC);
-	MOV(IND(30),R0);
-	MOV(IND(R0),26);
 	MOV(INDD(R0,1),0);
 	MOV(INDD(R0,2),IMM(0));
+	/* lambda for bin-plus */
+	PUSH(IMM(3));
+	CALL(MALLOC);
+	DROP(IMM(1));
+	MOV(IND(R0),IMM(T_CLOSURE));
+	MOV(INDD(R0,1),IMM(0));
+	MOV(INDD(R0,2),LABEL(LABEL_PRIMITIVE_IS_STRING));
+	MOV(R1,25);
+	MOV(R1,INDD(R1,1));
+	MOV(INDD(R1,2),R0);
 
 	/* END of initialization */
 	
@@ -216,15 +189,38 @@ MOV(IND(1),40);
 	MOV(FP,SP);
 
 	/* code generation */
-		MOV(R0,IMM(37));
+		/* applic_3342065*/
+	/* applic_3342065 - B1 */
+	MOV(R0,IMM(27));
+	PUSH(R0);
+	/* pushing number of operands to stack */
+	PUSH(IMM(1));
+	/* generate applic's operator code */
+	/* fvar_string? */
+	MOV(R0,25);
+	MOV(R0,INDD(R0,1));
+	MOV(R0,INDD(R0,2));
+	CMP(R0,IMM(0));
+	JUMP_EQ(ERROR_UNDEFINED_VAR_PRE_3342066);
+	JUMP(NO_ERROR_UNDEFINED_3342066);
+	ERROR_UNDEFINED_VAR_PRE_3342066:
+	MOV(R1,16);
+	JUMP(ERROR_UNDEFINED_VAR);
+	NO_ERROR_UNDEFINED_3342066:
+	/* final stage of the procedure */
+	CMP(INDD(R0,0),IMM(T_CLOSURE));
+	JUMP_NE(ERROR_NST);
+	PUSH(INDD(R0,1));
+	CALLA(INDD(R0,2));
+	MOV(R6,STARG(0));
+	ADD(R6,IMM(2));
+	DROP(R6);
 
 END:
 	PUSH(R0);
 	CALL(WRITE_SOB);
 	DROP(IMM(1));
-	
-	print_heap();
-		
+			
 	STOP_MACHINE;
 
 	return 0;

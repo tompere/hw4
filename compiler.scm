@@ -1301,7 +1301,7 @@
 				))
 			((eq? 'vector (caar consts-list))
 				(string-append
-					"\t/* Allocate memory and create the SOB vector: \"" (list->string (vector->list (cadar consts-list))) "\" */\n"
+					;"\t/* Allocate memory and create the SOB vector: \"" (list->string (vector->list (cadar consts-list))) "\" */\n"
 					(cg-vector-elements (cadar consts-list) (- (vector-length (cadar consts-list)) 1))
 					"\tPUSH(IMM(" (number->string (vector-length (cadar consts-list))) "));\n"
 					"\tCALL(MAKE_SOB_VECTOR);\n"
@@ -1473,8 +1473,68 @@
 			))
 	))
 		
-
-
+(define cg-primitive
+	(lambda (symbol-list)
+		(cond
+			((null? symbol-list) "")
+			((generate-primitive-label (cadar symbol-list))
+				(string-append
+					"\t/* lambda for " (generate-primitive-label (cadar symbol-list)) " */\n"
+					"\tPUSH(IMM(3));\n"
+					"\tCALL(MALLOC);\n"
+					"\tDROP(IMM(1));\n"
+					"\tMOV(IND(R0),IMM(T_CLOSURE));\n"
+					"\tMOV(INDD(R0,1),IMM(0));\n"
+					"\tMOV(INDD(R0,2),LABEL(LABEL_PRIMITIVE_" (generate-primitive-label (cadar symbol-list)) "));\n"
+					"\tMOV(R1," (number->string (get-const-address (cadar symbol-list) global-const-address))  ");\n"
+					"\tMOV(R1,INDD(R1,1));\n"
+					"\tMOV(INDD(R1,2),R0);\n"
+					(cg-primitive (cdr symbol-list))))
+			(else (cg-primitive (cdr symbol-list)))
+		)))
+		
+(define generate-primitive-label
+	(lambda (name)
+		(cond
+			((equal? name 'bin+) "BIN_PLUS")
+			((equal? name 'bin-) "BIN_MINUS")
+			((equal? name 'procedure?) "IS_PROCEDURE")
+			((equal? name 'vector?) "IS_VECTOR")
+			((equal? name 'symbol?) "IS_SYMBOL")
+			((equal? name 'string?) "IS_STRING")
+			((equal? name 'char?) "IS_CHAR")
+			((equal? name 'number?) "IS_NUMBER")
+			((equal? name 'boolean?) "IS_BOOLEAN")
+			((equal? name 'remainder) "REMAINDER")
+			((equal? name 'bin/) "BIN_DIVIDE")
+			((equal? name 'bin=?) "BIN_IS_EQUAL")
+			((equal? name 'bin<?) "BIN_IS_LESS")
+			((equal? name 'bin*) "BIN_MULTIPLY")
+			((equal? name 'cdr) "CDR")
+			((equal? name 'string->symbol) "STRING_TO_SYMBOL")
+			((equal? name 'eq?) "IS_EQUAL")
+			((equal? name 'set-cdr!) "SET_CDR")
+			((equal? name 'set-car!) "SET_CAR")
+			((equal? name 'apply) "APPLY")
+			((equal? name 'null?) "IS_NULL")
+			((equal? name 'integer->char) "INT_TO_CHAR")
+			((equal? name 'make-string) "MAKE_STRING")
+			((equal? name 'make-vector) "MAKE_VECTOR")
+			((equal? name 'vector-length) "VECTOR_LENGHT")
+			((equal? name 'string-set!) "SET_STRING")
+			((equal? name 'car) "CAR")
+			((equal? name 'string-ref) "STRING_REG" )
+			((equal? name 'vector-set!) "SET_VECTOR")
+			((equal? name 'symbol->string) "SYMBOL_TO_STRING")
+			((equal? name 'char->integer) "CHAR_TO_INT")
+			((equal? name 'string-length) "STRING_LENGTH")
+			((equal? name 'vector-ref) "VECTOR_REF")
+			((equal? name 'pair?) "IS_PAIR")
+			(else #f)
+			)))
+	
+	
+	
 	
 (define initial-buckets-address 16)
 
@@ -1581,6 +1641,7 @@ int main()
 	#include \"math.lib\"
 	#include \"string.lib\"
 	#include \"system.lib\"
+	#include \"primitives.lib\"
 	
 	"
 	(error-code)
@@ -1617,6 +1678,8 @@ CONTINUE:
 		(+ 3 initial-buckets-address) ; next address
 		(filter (lambda (e) (equal? (car e) 'symbol)) global-const-address)) ;filtered consts list (only symbols!)
 	
+	(cg-primitive (filter (lambda (e) (equal? (car e) 'symbol)) global-const-address))
+	
 	"
 	/* END of initialization */
 	
@@ -1635,13 +1698,12 @@ END:
 	PUSH(R0);
 	CALL(WRITE_SOB);
 	DROP(IMM(1));
-	
-	print_heap();
-		
+			
 	STOP_MACHINE;
 
 	return 0;
-}")
+}
+")
 				output) ;; check write / display
 			(close-output-port output))))
 			
