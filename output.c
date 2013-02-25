@@ -42,7 +42,33 @@ int main()
 	#include "string.lib"
 	#include "system.lib"
 	
-	
+		/* error_no-such-type */
+ERROR_NST:
+	PUSH(69);
+	PUSH(114);
+	PUSH(114);
+	PUSH(111);
+	PUSH(114);
+	PUSH(58);
+	PUSH(32);
+	PUSH(110);
+	PUSH(111);
+	PUSH(32);
+	PUSH(115);
+	PUSH(117);
+	PUSH(99);
+	PUSH(104);
+	PUSH(32);
+	PUSH(116);
+	PUSH(121);
+	PUSH(112);
+	PUSH(101);
+	PUSH(IMM(19));
+	CALL(MAKE_SOB_STRING);
+	DROP(IMM(20));
+	PUSH(R0);
+	CALL(WRITE_SOB_STRING);
+return 1;
 CONTINUE:
 	
 	/* Initialize stack with default values */
@@ -86,6 +112,7 @@ CONTINUE:
 	PUSH(IMM(3));
 	CALL(MAKE_SOB_STRING);
 	DROP(IMM(4));
+	/* Create bucket for symbol : abc */
 	PUSH(IMM(3));
 	CALL(MALLOC);
 	MOV(IND(22),R0);
@@ -104,11 +131,24 @@ CONTINUE:
 	MOV(FP,SP);
 
 	/* code generation */
-	
+		/* Test if_3342061 */
+	MOV(R0, IMM(14));
+	CMP(INDD(R0,1),IMM(0));
+	JUMP_EQ(DIF_LABEL_3342061);
+	/* Do-if-true if_3342061 */
+	MOV(R0,IMM(21));
+	JUMP(END_IF_3342061);
+	DIF_LABEL_3342061:
+	/* Do-if-false if_3342061 */
+	MOV(R0,IMM(23));
+	END_IF_3342061:
+
 END:
 	PUSH(R0);
 	CALL(WRITE_SOB);
 	DROP(IMM(1));
+	
+	print_heap();
 		
 	STOP_MACHINE;
 

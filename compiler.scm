@@ -781,7 +781,7 @@
 					(if (equal? c #t)
 						"\tMOV(R0, IMM(14));\n"
 						"\tMOV(R0, IMM(12));\n"	))
-				((or (char? c) (number? c) (string? c) (vector? c) (pair? c))
+				((or (char? c) (number? c) (string? c) (vector? c) (pair? c) (symbol? c))
 						(string-append "\tMOV(R0,IMM(" (number->string const-address) "));\n"))
 				))))
 
@@ -1272,7 +1272,7 @@
 				))
 			((eq? 'vector (caar consts-list))
 				(string-append
-					;"\t/* Allocate memory and create the SOB vector: \"" (list->string (vector->list (cadar consts-list))) "\" */\n"
+					"\t/* Allocate memory and create the SOB vector: \"" (list->string (vector->list (cadar consts-list))) "\" */\n"
 					(cg-vector-elements (cadar consts-list) (- (vector-length (cadar consts-list)) 1))
 					"\tPUSH(IMM(" (number->string (vector-length (cadar consts-list))) "));\n"
 					"\tCALL(MAKE_SOB_VECTOR);\n"
@@ -1327,12 +1327,12 @@
 (define get-consts-list 
 	(lambda (code ans)
 		(cond 
-			((or (null? code) (not (list? code))) ans)									; end of exp
+			((or (null? code) (not (list? code))) ans)	; end of exp
 			((and (pe-const? code) (or (pair? (cadr code)) (vector? (cadr code)) (symbol? (cadr code))))		; pair or vector - insert elements
 				(append ans (topological-sort (cadr code))))
-			((pe-fvar? code)			; symbol - insert as string
+			((pe-fvar? code)	; symbol - insert as string
 				(append ans (topological-sort (cadr code))))
-			((pe-const? code) 															; single const exp
+			((pe-const? code) ; single const exp
 				(append ans (cdr code)))
             (else (get-consts-list (cdr code) (get-consts-list (car code) ans)))
         )))
@@ -1428,6 +1428,7 @@
 		(if (null? const-list)
 			""
 			(string-append
+				"\t/* Create bucket for symbol : " (symbol->string (cadar const-list)) " */\n"
 				"\tPUSH(IMM(3));\n"
 				"\tCALL(MALLOC);\n"
 				"\tMOV(IND(" (number->string (+ (caddar const-list) 1)) "),R0);\n"
@@ -1529,7 +1530,7 @@ int main()
 	#include \"system.lib\"
 	
 	"
-	;(error-code)
+	(error-code)
 "
 CONTINUE:
 	
@@ -1552,11 +1553,13 @@ CONTINUE:
 	/* Increase address */
 	ADD(ADDR(0), IMM(15))\n;
 	
-	/* create symbol table based on constants */
+	/* create constants table*/
 	"
 	
 	(create-consts-table global-const-address)
-	(create-symbol-table (+ 3 initial-buckets-address) (filter (lambda (e) (equal? (car e) 'symbol)) global-const-address))
+	(create-symbol-table 
+		(+ 3 initial-buckets-address) ; next address
+		(filter (lambda (e) (equal? (car e) 'symbol)) global-const-address)) ;filtered consts list (only symbols!)
 	
 	"
 	
@@ -1571,12 +1574,14 @@ CONTINUE:
 
 	/* code generation */
 	"
-	;(code-gen input 0)	
+	(code-gen input 0)	
 	"
 END:
 	PUSH(R0);
 	CALL(WRITE_SOB);
 	DROP(IMM(1));
+	
+	print_heap();
 		
 	STOP_MACHINE;
 
