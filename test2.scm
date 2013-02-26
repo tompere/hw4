@@ -1,1 +1,1 @@
-(if (symbol? 'abc) (string->symbol "abc") #f)
+"a"

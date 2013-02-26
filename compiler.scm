@@ -754,6 +754,15 @@
 ;;; Input: scheme code
 ;;; Output: pseudo-assembly code
 
+(define list-code-gen
+	(lambda (code)
+		(if (null? code)
+			""
+			(string-append
+				(code-gen (car code) 0)
+				(list-code-gen (cdr code))
+			))))
+
 ;; CodeGen main function
 (define code-gen
 	(lambda (pe env)
@@ -1520,11 +1529,11 @@
 			((equal? name 'integer->char) "INT_TO_CHAR")
 			((equal? name 'make-string) "MAKE_STRING")
 			((equal? name 'make-vector) "MAKE_VECTOR")
-			((equal? name 'vector-length) "VECTOR_LENGHT")
-			((equal? name 'string-set!) "SET_STRING")
+			((equal? name 'vector-length) "VECTOR_LENGTH")
+			((equal? name 'string-set!) "STRING_SET")
 			((equal? name 'car) "CAR")
-			((equal? name 'string-ref) "STRING_REG" )
-			((equal? name 'vector-set!) "SET_VECTOR")
+			((equal? name 'string-ref) "STRING_REF" )
+			((equal? name 'vector-set!) "VECTOR_SET")
 			((equal? name 'symbol->string) "SYMBOL_TO_STRING")
 			((equal? name 'char->integer) "CHAR_TO_INT")
 			((equal? name 'string-length) "STRING_LENGTH")
@@ -1593,8 +1602,8 @@
 (define compile-scheme-file
 	(lambda (inputFileName outputFileName)
 		(let (	(output (open-output-file outputFileName 'replace))			
-				(input (car (map pe->lex-pe (map parse (tokens->sexprs (list->tokens 
-				(file->list inputFileName)))))))    ) ;;;;add anotate-tc
+				(input (map pe->lex-pe (map parse (tokens->sexprs (list->tokens 
+				(file->list inputFileName))))))) ;;;;add anotate-tc
 			(set! global-const-address (get-consts input))
 			(display 
 				(string-append
@@ -1692,7 +1701,7 @@ CONTINUE:
 
 	/* code generation */
 	"
-	(code-gen input 0)	
+	(list-code-gen input)	
 	"
 END:
 	PUSH(R0);
