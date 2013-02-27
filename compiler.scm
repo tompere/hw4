@@ -763,9 +763,13 @@
 				(list-code-gen (cdr code))
 			))))
 
+(define hhhhh 0)
+(define hhh2
+	(lambda () (set! hhhhh (+ 1 hhhhh)) hhhhh))
+
 ;; CodeGen main function
 (define code-gen
-	(lambda (pe env)
+	(lambda (pe env) (string-append "printf(\"num#%d\"," (number->string (hhh2)) ");\n"
 		(cond
 			((pe-const? pe) (cg-const (cadr pe)))
 			((pe-if-3? pe) (cg-if-3 pe env))
@@ -781,7 +785,7 @@
 			((pe-tc-applic? pe) (cg-tc-applic (cdr pe) env))
 			((pe-define? pe) (cg-define (cdr pe) env))
 			(else "")
-			)))
+			))))
 			
 ;;;;;;;;;; sub-CodeGen function ;;;;;;;;;	
 
@@ -950,7 +954,9 @@
 				"\tJUMP(LOOP_" unique-tag ");\n"
 				"END_LOOP_" unique-tag ":\n"
 				"\tMOV(R2,R0);\n"
-				"\tPUSH(FPARG(1));\n"
+				"\tMOV(R4,FPARG(1));\n"	;;;;;;;;;;;;
+				"\tADD(R4,IMM(1));\n"	;;;;;;;;;;;;				
+				"\tPUSH(R4);\n";;;;;;;;
 				"\tCALL(MALLOC);\n"
 				"\tDROP(IMM(1));\n"
 				"\tMOV(IND(R2),R0);\n"
@@ -964,6 +970,7 @@
 				"\tADD(R4,IMM(1));\n"
 				"\tJUMP(LOOP_PARAMS_" unique-tag ");\n"
 				"END_LOOP_PARAMS_" unique-tag ":\n"
+				"\tMOV(INDD(R0,R4),IMM(11));\n"	;;;;;;;;;;;
 				"\tMOV(INDD(R1,2),LABEL(L_CLOS_CODE_" unique-tag "));\n"
 				"\tMOV(R0,R1);\n"
 				"\tJUMP(L_CLOS_EXIT_" unique-tag ");\n"
@@ -1008,7 +1015,9 @@
 				"\tJUMP(LOOP_" unique-tag ");\n"
 				"END_LOOP_" unique-tag ":\n"
 				"\tMOV(R2,R0);\n"
-				"\tPUSH(FPARG(1));\n"
+				"\tMOV(R4,FPARG(1));\n"	;;;;;;;;;;;;
+				"\tADD(R4,IMM(1));\n"	;;;;;;;;;;;;				
+				"\tPUSH(R4);\n";;;;;;;;
 				"\tCALL(MALLOC);\n"
 				"\tDROP(IMM(1));\n"
 				"\tMOV(IND(R2),R0);\n"
@@ -1022,6 +1031,7 @@
 				"\tADD(R4,IMM(1));\n"
 				"\tJUMP(LOOP_PARAMS_" unique-tag ");\n"
 				"END_LOOP_PARAMS_" unique-tag ":\n"
+				"\tMOV(INDD(R0,R4),IMM(11));\n"	;;;;;;;;;;;
 				"\tMOV(INDD(R1,2),LABEL(L_CLOS_CODE_" unique-tag "));\n"
 				"\tMOV(R0,R1);\n"
 				"\tJUMP(L_CLOS_EXIT_" unique-tag ");\n"
@@ -1032,17 +1042,27 @@
 				"\t/* stack adjustment for lambda-opt : make a list (based on pairs) for each FPARG(i) */\n"
 				"\tMOV(R7,IMM(FPARG(1)));\n"
 				"\tADD(R7,IMM(1));\n"
+				;;;;;;; MAGIC addition
+				"\tCMP(R7,IMM(" (number->string (+ 1 (length params))) "));\n"
+				"\tJUMP_EQ(PARAMS_OPT_MAGIC_" unique-tag ");\n"
+				;;;;;;;;				
 				"\tPUSH(IMM(11));\n"
 				"\tPUSH(FPARG(R7));\n"
 				"\tCALL(MAKE_SOB_PAIR);\n"
 				"\tDROP(IMM(2));\n"
 				"\tSUB(R7,IMM(1));\n"
+				;;;;;;; MAGIC addition
+				"\tJUMP(LOOP_PARAMS_OPT_" unique-tag ");\n"
+				"PARAMS_OPT_MAGIC_" unique-tag ":\n"
+				"\tMOV(R0,IMM(11));\n"
+				"\tSUB(R7,IMM(1));\n"
+				;;;;;;;;
 				;loop - make lisy of T_PAIR
 				"LOOP_PARAMS_OPT_" unique-tag ":\n"
 				"\tCMP(R7,IMM(" rest-param-index "));\n"	
 				"\tJUMP_LT(END_LOOP_PARAMS_OPT_" unique-tag ");\n"
-				"\tPUSH(FPARG(R7));\n"
 				"\tPUSH(R0);\n"
+				"\tPUSH(FPARG(R7));\n"
 				"\tCALL(MAKE_SOB_PAIR);\n"
 				"\tDROP(IMM(2));\n"
 				"\tSUB(R7,IMM(1));\n"
@@ -1088,7 +1108,9 @@
 				"\tJUMP(LOOP_" unique-tag ");\n"
 				"END_LOOP_" unique-tag ":\n"
 				"\tMOV(R2,R0);\n"
-				"\tPUSH(FPARG(1));\n"
+				"\tMOV(R4,FPARG(1));\n"	;;;;;;;;;;;;
+				"\tADD(R4,IMM(1));\n"	;;;;;;;;;;;;				
+				"\tPUSH(R4);\n";;;;;;;;
 				"\tCALL(MALLOC);\n"
 				"\tDROP(IMM(1));\n"
 				"\tMOV(IND(R2),R0);\n"
@@ -1102,6 +1124,7 @@
 				"\tADD(R4,IMM(1));\n"
 				"\tJUMP(LOOP_PARAMS_" unique-tag ");\n"
 				"END_LOOP_PARAMS_" unique-tag ":\n"
+				"\tMOV(INDD(R0,R4),IMM(11));\n"	;;;;;;;;;;;
 				"\tMOV(INDD(R1,2),LABEL(L_CLOS_CODE_" unique-tag "));\n"
 				"\tMOV(R0,R1);\n"
 				"\tJUMP(L_CLOS_EXIT_" unique-tag ");\n"
@@ -1112,17 +1135,27 @@
 				"\t/* stack adjustment for lambda-variadic : make a list (based on pairs) */\n"
 				"\tMOV(R8,IMM(FPARG(1)));\n"
 				"\tADD(R8,IMM(1));\n"
+				;;;;;;; MAGIC addition
+				"\tCMP(R8,IMM(1));\n"
+				"\tJUMP_EQ(PARAMS_VARIADIC_MAGIC_" unique-tag ");\n"
+				;;;;;;;;
 				"\tPUSH(IMM(11));\n"
 				"\tPUSH(FPARG(R8));\n"
 				"\tCALL(MAKE_SOB_PAIR);\n"
 				"\tDROP(IMM(2));\n"
 				"\tSUB(R8,IMM(1));\n"
+				;;;;;;; MAGIC addition
+				"\tJUMP(LOOP_PARAMS_VARIADIC_" unique-tag ");\n"
+				"PARAMS_VARIADIC_MAGIC_" unique-tag ":\n"
+				"\tMOV(R0,IMM(11));\n"
+				"\tSUB(R8,IMM(1));\n"
+				;;;;;;;;
 				;loop - make list of T_PAIR
 				"LOOP_PARAMS_VARIADIC_" unique-tag ":\n"
 				"\tCMP(R8,IMM(2));\n"	
 				"\tJUMP_LT(END_LOOP_PARAMS_VARIADIC_" unique-tag ");\n"
-				"\tPUSH(FPARG(R8));\n"
 				"\tPUSH(R0);\n"
+				"\tPUSH(FPARG(R8));\n"
 				"\tCALL(MAKE_SOB_PAIR);\n"
 				"\tDROP(IMM(2));\n"
 				"\tSUB(R8,IMM(1));\n"
@@ -1145,9 +1178,10 @@
 			(operands (cadr pe)))
 			(string-append
 				"\t/* applic_" unique-tag "*/\n"
+				"\tPUSH(IMM(11));\n"										;;;;;; MAGIC
 				(map-cg-applic operands env unique-tag 0)
 				"\t/* pushing number of operands to stack */\n"
-				"\tPUSH(IMM(" (number->string (length operands)) "));\n"
+				"\tPUSH(IMM(" (number->string (length operands)) "));\n"	;;;;;;
 				"\t/* generate applic's operator code */\n"
 				(code-gen procedure env)
 				"\t/* final stage of the procedure */\n"
@@ -1158,7 +1192,7 @@
 ;				"\tMOV(IND(R1),IMM(2));\n"
 ;				"\tADD(IND(R1),IMM("(number->string (length operands))"));\n"
 				"\tMOV(R6,STARG(0));\n"
-				"\tADD(R6,IMM(2));\n"
+				"\tADD(R6,IMM(3));\n"								;;;;;;;; DELETE +1 FOR MAGIC
 				"\tDROP(R6);\n"
 ;				"\tMOV(IND(SP),IND(R1));\n"
 				))))
@@ -1684,13 +1718,23 @@ CONTINUE:
 	
 	(create-consts-table global-const-address)
 	
+	"/* end of constants table creation */"
+		
 	"MOV(IND(1)," (number->string initial-buckets-address) ");\n" ;set address for begining of symbol table
+
+	"/* create symbol table */"
 	
 	(create-symbol-table 
 		(+ 3 initial-buckets-address) ; next address
 		(filter (lambda (e) (equal? (car e) 'symbol)) global-const-address)) ;filtered consts list (only symbols!)
+
+	"/* end of symbol table creation */"
+	
+	"/* create relevant primitive functions */"
 	
 	(cg-primitive (filter (lambda (e) (equal? (car e) 'symbol)) global-const-address))
+
+	"/* end of primitive functions creation */"
 	
 	"
 	/* END of initialization */

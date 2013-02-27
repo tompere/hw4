@@ -1,8 +1,25 @@
-
-
-(eq? (apply (lambda (x y z w w2 w4) w2 w4) '(1 2 3 4 5 6)) 6)
-
-; (eq? (apply (lambda () #f) '()) #f)
-; (bin=? (apply (lambda (x y) (bin+ x y)) '(1 2)) 3)
-; (eq? (apply (lambda (x y) y) '(1 2)) 2)
-;  (eq? (apply (lambda (x y z w) w) '(1 2 3 4)) 4)
+(define map
+  ((lambda (y) 
+     ((lambda (map1) 
+	((lambda (maplist) 
+	   (lambda (f . s) 
+	     (maplist f s))) 
+	 (y (lambda (maplist) 
+	      (lambda (f s) 
+		(if (null? (car s)) '() 
+		    (cons (apply f (map1 car s)) 
+			  (maplist f (map1 cdr s))))))))) 
+      (y (lambda (map1) 
+	   (lambda (f s) 
+	     (if (null? s) '() 
+		 (cons (f (car s)) 
+		       (map1 f (cdr s))))))))) 
+   (lambda (f) 
+     ((lambda (x) 
+	(f (lambda args 
+	     (apply (x x) args)))) 
+      (lambda (x) 
+	(f (lambda args 
+	     (apply (x x) args))))))))
+		 
+(map (lambda (x) (bin+ x x)) '(1 2 3))
