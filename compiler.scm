@@ -433,8 +433,8 @@
 		       (let* ,rest . ,exprs)))))
 	  ;; letrec
 	  (pattern-rule
-	   `(letrec ,(? 'c))
-	   (lambda (c) (parse (expand-letrec `(letrec ,c)))))
+	   `(letrec . ,(? 'c))
+	   (lambda (c) (parse (expand-letrec `(letrec . ,c)))))
 	  ;; quaziquote
 	  (pattern-rule
 	   `(quasiquote ,(? 'c))
@@ -573,7 +573,7 @@
 
 ;;;;;;;;;;;;; letrec expander ;;;;;;;;;;;;;
 
-(define Yn
+(define yn
   (lambda fs
     (let ((ms (map
 		  (lambda (fi)
@@ -594,7 +594,7 @@
 	       (fs `((lambda ,names ,@exprs)
 		     ,@(map (lambda (rib) `(lambda ,names ,(cadr rib)))
 			 ribs))))
-	  `(Yn ,@fs))))))
+	  `(yn ,@fs))))))
 
 ;;;;;;;;;;;; Duplication test in a let arguments
 
@@ -787,15 +787,16 @@
 
 (define cg-const
 	(lambda (c)
-		(let ((const-address (get-const-address c global-const-address)))
-			(cond
-				((boolean? c) 
-					(if (equal? c #t)
-						"\tMOV(R0, IMM(14));\n"
-						"\tMOV(R0, IMM(12));\n"	))
-				((or (char? c) (number? c) (string? c) (vector? c) (pair? c) (symbol? c))
-						(string-append "\tMOV(R0,IMM(" (number->string const-address) "));\n"))
-				))))
+		(cond
+			((boolean? c) 
+				(if (equal? c #t)
+					"\tMOV(R0, IMM(14));\n"
+					"\tMOV(R0, IMM(12));\n"	))
+			((null? c) "\tMOV(R0, IMM(11));\n")
+			((equal? c *void-object*) "\tMOV(R0, IMM(10));\n")
+			((or (char? c) (number? c) (string? c) (vector? c) (pair? c) (symbol? c))
+					(string-append "\tMOV(R0,IMM(" (number->string (get-const-address c global-const-address)) "));\n"))
+		)))
 
 (define cg-if-3
 	(lambda (pe env)
@@ -1422,6 +1423,7 @@
 			((null? const-list) ans)
 			((or 	(boolean? (car const-list))
 					(null? (car const-list))
+					(equal? (car const-list) (void))
 					((lambda (e listof) 
 						(if (list? (member e listof)) ; check if e exists in listof 
 							#t
@@ -1539,6 +1541,7 @@
 			((equal? name 'string-length) "STRING_LENGTH")
 			((equal? name 'vector-ref) "VECTOR_REF")
 			((equal? name 'pair?) "IS_PAIR")
+			((equal? name 'cons) "CONS")
 			(else #f)
 			)))
 	
