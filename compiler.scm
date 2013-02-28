@@ -759,33 +759,29 @@
 		(if (null? code)
 			""
 			(string-append
-				(code-gen (car code) 0)
+				(code-gen (car code) 0 0)
 				(list-code-gen (cdr code))
 			))))
 
-(define hhhhh 0)
-(define hhh2
-	(lambda () (set! hhhhh (+ 1 hhhhh)) hhhhh))
-
 ;; CodeGen main function
 (define code-gen
-	(lambda (pe env) (string-append "printf(\"num#%d\"," (number->string (hhh2)) ");\n"
+	(lambda (pe env p-length)
 		(cond
 			((pe-const? pe) (cg-const (cadr pe)))
-			((pe-if-3? pe) (cg-if-3 pe env))
-			((pe-or? pe) (cg-or (cadr pe) env))
-			((pe-seq? pe) (cg-seq (cadr pe) env))
+			((pe-if-3? pe) (cg-if-3 pe env p-length))
+			((pe-or? pe) (cg-or (cadr pe) env p-length))
+			((pe-seq? pe) (cg-seq (cadr pe) env p-length))
 			((pe-pvar? pe) (cg-pvar (cdr pe)))
 			((pe-bvar? pe) (cg-bvar (cdr pe)))
 			((pe-fvar? pe) (cg-fvar (cdr pe)))
-			((pe-lambda-simple? pe) (cg-lambda-simple (cdr pe) env))
-			((pe-lambda-opt? pe) (cg-lambda-opt (cdr pe) env))
-			((pe-lambda-variadic? pe) (cg-lambda-variadic (cdr pe) env))
-			((pe-applic? pe) (cg-applic (cdr pe) env))
-			((pe-tc-applic? pe) (cg-tc-applic (cdr pe) env))
-			((pe-define? pe) (cg-define (cdr pe) env))
+			((pe-lambda-simple? pe) (cg-lambda-simple (cdr pe) env p-length))
+			((pe-lambda-opt? pe) (cg-lambda-opt (cdr pe) env p-length))
+			((pe-lambda-variadic? pe) (cg-lambda-variadic (cdr pe) env p-length))
+			((pe-applic? pe) (cg-applic (cdr pe) env p-length))
+			((pe-tc-applic? pe) (cg-tc-applic (cdr pe) env p-length))
+			((pe-define? pe) (cg-define (cdr pe) env p-length))
 			(else "")
-			))))
+			)))
 			
 ;;;;;;;;;; sub-CodeGen function ;;;;;;;;;	
 
@@ -803,38 +799,38 @@
 		)))
 
 (define cg-if-3
-	(lambda (pe env)
+	(lambda (pe env p-length)
 		(set-unique-tag)
 		(let 
 			( (unique-tag (number->string current-unique-tag)) )
 			(string-append
 				"\t/* Test if_" unique-tag " */\n"
-				(code-gen (cadr pe) env) ;test (returns in R0 an ADDRESS of scheme object boolean)
+				(code-gen (cadr pe) env p-length) ;test (returns in R0 an ADDRESS of scheme object boolean)
 				"\tCMP(INDD(R0,1),IMM(0));\n"
 				"\tJUMP_EQ(DIF_LABEL_" unique-tag ");\n"
 				"\t/* Do-if-true if_" unique-tag " */\n"
-				(code-gen (caddr pe) env) ;do-if-true
+				(code-gen (caddr pe) env p-length) ;do-if-true
 				"\tJUMP(END_IF_" unique-tag ");\n"
 				"\tDIF_LABEL_" unique-tag ":\n"
 				"\t/* Do-if-false if_" unique-tag " */\n"
-				(code-gen (cadddr pe) env) ;do-if-false
+				(code-gen (cadddr pe) env p-length) ;do-if-false
 				"\tEND_IF_" unique-tag ":\n"
 				""))))
 
 ; input (pe) is a list of expressions in or				
 (define cg-or
-	(lambda (pe env)
+	(lambda (pe env p-length)
 		(set-unique-tag)
 		(let 
 			( (unique-tag (number->string current-unique-tag)) )
 			(string-append
 				"\t/* BEGIN_OR_" unique-tag " */\n"	
-				(map-cg-or-light pe env unique-tag "")
+				(map-cg-or-light pe env p-length unique-tag "")
 				"\tEND_OR_" unique-tag ":\n"
 				""))))
 				
 (define map-cg-or-light
-	(lambda (pe env unique-tag ans)
+	(lambda (pe env p-length unique-tag ans)
 		(if (null? pe)
 			ans
 			(cond 
@@ -842,33 +838,34 @@
 					(string-append
 							ans
 							"\t/* or_" unique-tag " | Test expression i */\n"	
-							(code-gen pe env)
+							(code-gen pe env p-length)
 							"\tCMP(INDD(R0,1),IMM(0));\n"
 							"\tJUMP_NE(END_OR_" unique-tag ");\n"))
 				((list? pe)
 					(map-cg-or-light 
 						(cdr pe)
 						env
+						p-length
 						unique-tag 
 						(string-append
 							ans
 							"\t/* or_" unique-tag " | Test expression i */\n"	
-							(code-gen (car pe) env)
+							(code-gen (car pe) env p-length)
 							"\tCMP(INDD(R0,1),IMM(0));\n"
 							"\tJUMP_NE(END_OR_" unique-tag ");\n")))))))
 	
 (define cg-seq
-	(lambda (pe env)
+	(lambda (pe env p-length)
 		(set-unique-tag)
 		(let 
 			( (unique-tag (number->string current-unique-tag)) )
 			(string-append
 				"\t/* BEGIN_SEQ_" unique-tag " */\n"	
-				(map-cg-seq-light pe env unique-tag "")
+				(map-cg-seq-light pe env p-length unique-tag "")
 				""))))
 
 (define map-cg-seq-light
-	(lambda (pe env unique-tag ans)
+	(lambda (pe env p-length unique-tag ans)
 		(cond 
 			((null? pe) 
 				ans)
@@ -876,17 +873,18 @@
 				(string-append
 						ans
 						"\t/* seq_" unique-tag " | expression i */\n"	
-						(code-gen pe env)
+						(code-gen pe env p-length)
 						))
 			((list? pe)
 				(map-cg-seq-light 
 					(cdr pe)
 					env
+					p-length
 					unique-tag
 					(string-append
 						ans
 						"\t/* seq_" unique-tag " | expression i */\n"	
-						(code-gen (car pe) env)
+						(code-gen (car pe) env p-length)
 						))))))
 							
 (define cg-pvar
@@ -924,15 +922,11 @@
 				"\tNO_ERROR_UNDEFINED_" unique-tag ":\n"
 		))))
 
-(define cg-lambda-simple
-	(lambda (pe env)
-		(set-unique-tag)
-		(let 
-			((unique-tag (number->string current-unique-tag))
-			(params (car pe))
-			(body (cadr pe)))
-			(string-append
-				"\t/* Part A : lambda-simple " unique-tag "*/\n"
+(define cg-base-lambda
+	(lambda (pe env p-length unique-tag)
+		(string-append
+				"\t/* Part A : lambda " unique-tag "*/\n"
+				"\tPUSH(R1); PUSH(R2); PUSH(R3); PUSH(R4); PUSH(R5);\n"	;;;;; **** ;;;
 				"\tPUSH(IMM(3));\n"
 				"\tCALL(MALLOC);\n"
 				"\tDROP(IMM(1));\n"
@@ -954,38 +948,48 @@
 				"\tJUMP(LOOP_" unique-tag ");\n"
 				"END_LOOP_" unique-tag ":\n"
 				"\tMOV(R2,R0);\n"
-				"\tMOV(R4,FPARG(1));\n"	;;;;;;;;;;;;
-				"\tADD(R4,IMM(1));\n"	;;;;;;;;;;;;				
-				"\tPUSH(R4);\n";;;;;;;;
+				"\tPUSH(" (number->string p-length) ");\n"
 				"\tCALL(MALLOC);\n"
 				"\tDROP(IMM(1));\n"
 				"\tMOV(IND(R2),R0);\n"
 				"\tMOV(R4,IMM(0));\n"
 				"\tMOV(R5,IMM(2));\n"
 				"LOOP_PARAMS_" unique-tag ":\n"
-				"\tCMP(R4,FPARG(1));\n"
+				"\tCMP(R4," (number->string p-length) ");\n"
 				"\tJUMP_GE(END_LOOP_PARAMS_" unique-tag ");\n"
 				"\tMOV(INDD(R0,R4),FPARG(R5));\n"
 				"\tADD(R5,IMM(1));\n"
 				"\tADD(R4,IMM(1));\n"
 				"\tJUMP(LOOP_PARAMS_" unique-tag ");\n"
 				"END_LOOP_PARAMS_" unique-tag ":\n"
-				"\tMOV(INDD(R0,R4),IMM(11));\n"	;;;;;;;;;;;
 				"\tMOV(INDD(R1,2),LABEL(L_CLOS_CODE_" unique-tag "));\n"
 				"\tMOV(R0,R1);\n"
+				"\tPOP(R5); POP(R4); POP(R3); POP(R2); POP(R1);\n" ;;;;***;;;
 				"\tJUMP(L_CLOS_EXIT_" unique-tag ");\n"
+			)))
+			
+		
+(define cg-lambda-simple
+	(lambda (pe env p-length)
+		(set-unique-tag)
+		(let 
+			((unique-tag (number->string current-unique-tag))
+			(params (car pe))
+			(body (cadr pe)))
+			(string-append
+				(cg-base-lambda pe env p-length unique-tag)
 				"\t/* Part B : lambda-simple " unique-tag "*/\n"
 				"L_CLOS_CODE_" unique-tag ":\n"
 				"\tPUSH(FP);\n"
 				"\tMOV(FP,SP);\n"
-				(code-gen body (+ env 1))
+				(code-gen body (+ env 1) (length params))
 				"\tPOP(FP);\n"
 				"RETURN;\n"
 				"L_CLOS_EXIT_" unique-tag ":\n"
 		))))
 
 (define cg-lambda-opt
-	(lambda (pe env)
+	(lambda (pe env p-length)
 		(set-unique-tag)
 		(let 
 			((unique-tag (number->string current-unique-tag))
@@ -993,70 +997,24 @@
 			(rest-param-index (number->string (+ (length (car pe)) 2)))
 			(body (caddr pe)))
 			(string-append
-				"\t/* Part A : lambda-opt " unique-tag "*/\n"
-				"\tPUSH(IMM(3));\n"
-				"\tCALL(MALLOC);\n"
-				"\tDROP(IMM(1));\n"
-				"\tMOV(IND(R0),IMM(T_CLOSURE));\n"
-				"\tMOV(R1,R0);\n" ;R1[0] points on R0 address (with T_CLOSURE at the moment)
-				"\tPUSH(IMM(" (number->string (+ env 1)) "));\n"
-				"\tCALL(MALLOC);\n"
-				"\tDROP(IMM(1));\n"
-				"\tMOV(INDD(R1,1),R0);\n" ;R1[1] gets the increased-by-one enviornment 
-				"\tMOV(R2,IMM(0));\n"
-				"\tMOV(R3,IMM(1));\n" 
-				"LOOP_" unique-tag ":\n"
-				"\tCMP(R2,IMM(" (number->string env) "));\n"
-				"\tJUMP_GE(END_LOOP_" unique-tag ");\n"
-				"\tMOV(R4,FPARG(0));\n"
-				"\tMOV(INDD(R0,R3),INDD(R4,R2));\n"
-				"\tADD(R2,IMM(1));\n"
-				"\tADD(R3,IMM(1));\n"
-				"\tJUMP(LOOP_" unique-tag ");\n"
-				"END_LOOP_" unique-tag ":\n"
-				"\tMOV(R2,R0);\n"
-				"\tMOV(R4,FPARG(1));\n"	;;;;;;;;;;;;
-				"\tADD(R4,IMM(1));\n"	;;;;;;;;;;;;				
-				"\tPUSH(R4);\n";;;;;;;;
-				"\tCALL(MALLOC);\n"
-				"\tDROP(IMM(1));\n"
-				"\tMOV(IND(R2),R0);\n"
-				"\tMOV(R4,IMM(0));\n"
-				"\tMOV(R5,IMM(2));\n"
-				"LOOP_PARAMS_" unique-tag ":\n"
-				"\tCMP(R4,FPARG(1));\n"
-				"\tJUMP_GE(END_LOOP_PARAMS_" unique-tag ");\n"
-				"\tMOV(INDD(R0,R4),FPARG(R5));\n"
-				"\tADD(R5,IMM(1));\n"
-				"\tADD(R4,IMM(1));\n"
-				"\tJUMP(LOOP_PARAMS_" unique-tag ");\n"
-				"END_LOOP_PARAMS_" unique-tag ":\n"
-				"\tMOV(INDD(R0,R4),IMM(11));\n"	;;;;;;;;;;;
-				"\tMOV(INDD(R1,2),LABEL(L_CLOS_CODE_" unique-tag "));\n"
-				"\tMOV(R0,R1);\n"
-				"\tJUMP(L_CLOS_EXIT_" unique-tag ");\n"
+				(cg-base-lambda pe env p-length unique-tag)
 				"\t/* Part B : lambda-opt " unique-tag "*/\n"
 				"L_CLOS_CODE_" unique-tag ":\n"
 				"\tPUSH(FP);\n"
 				"\tMOV(FP,SP);\n"
+				"\tPUSH(R7);\n"		;;;;; **** ;;;;;
 				"\t/* stack adjustment for lambda-opt : make a list (based on pairs) for each FPARG(i) */\n"
-				"\tMOV(R7,IMM(FPARG(1)));\n"
-				"\tADD(R7,IMM(1));\n"
+				"\tMOV(R7,FPARG(1));\n"
 				;;;;;;; MAGIC addition
-				"\tCMP(R7,IMM(" (number->string (+ 1 (length params))) "));\n"
-				"\tJUMP_EQ(PARAMS_OPT_MAGIC_" unique-tag ");\n"
+				 "\tCMP(R7,IMM(" (number->string(length params)) "));\n"
+				 "\tJUMP_EQ(PARAMS_OPT_MAGIC_" unique-tag ");\n"
 				;;;;;;;;				
+				"\tADD(R7,IMM(1));\n"
 				"\tPUSH(IMM(11));\n"
 				"\tPUSH(FPARG(R7));\n"
 				"\tCALL(MAKE_SOB_PAIR);\n"
 				"\tDROP(IMM(2));\n"
 				"\tSUB(R7,IMM(1));\n"
-				;;;;;;; MAGIC addition
-				"\tJUMP(LOOP_PARAMS_OPT_" unique-tag ");\n"
-				"PARAMS_OPT_MAGIC_" unique-tag ":\n"
-				"\tMOV(R0,IMM(11));\n"
-				"\tSUB(R7,IMM(1));\n"
-				;;;;;;;;
 				;loop - make lisy of T_PAIR
 				"LOOP_PARAMS_OPT_" unique-tag ":\n"
 				"\tCMP(R7,IMM(" rest-param-index "));\n"	
@@ -1071,8 +1029,10 @@
 				"\tEND_LOOP_PARAMS_OPT_" unique-tag ":\n"
 				; insert list into FPARG(params + 1)
 				"\tMOV(FPARG(" rest-param-index "),R0);\n"
+				"PARAMS_OPT_MAGIC_" unique-tag ":\n"
+				"\tPOP(R7);\n"	;;;;; *** ;;;;
 				"\t/* lambda-opt body */\n"
-				(code-gen body (+ env 1))
+				(code-gen body (+ env 1) (+ 1 (length params)))
 				"\tPOP(FP);\n"
 				"\tRETURN;\n"
 				"L_CLOS_EXIT_" unique-tag ":\n"
@@ -1080,76 +1040,30 @@
 		
 		
 (define cg-lambda-variadic
-	(lambda (pe env)
+	(lambda (pe env p-length)
 		(set-unique-tag)
 		(let 
 			((unique-tag (number->string current-unique-tag))
 			(body (cadr pe)))
 			(string-append
-				"\t/* Part A : lambda-variadic " unique-tag "*/\n"
-				"\tPUSH(IMM(3));\n"
-				"\tCALL(MALLOC);\n"
-				"\tDROP(IMM(1));\n"
-				"\tMOV(IND(R0),IMM(T_CLOSURE));\n"
-				"\tMOV(R1,R0);\n" ;R1[0] points on R0 address (with T_CLOSURE at the moment)
-				"\tPUSH(IMM(" (number->string (+ env 1)) "));\n"
-				"\tCALL(MALLOC);\n"
-				"\tDROP(IMM(1));\n"
-				"\tMOV(INDD(R1,1),R0);\n" ;R1[1] gets the increased-by-one enviornment 
-				"\tMOV(R2,IMM(0));\n"
-				"\tMOV(R3,IMM(1));\n" 
-				"LOOP_" unique-tag ":\n"
-				"\tCMP(R2,IMM(" (number->string env) "));\n"
-				"\tJUMP_GE(END_LOOP_" unique-tag ");\n"
-				"\tMOV(R4,FPARG(0));\n"
-				"\tMOV(INDD(R0,R3),INDD(R4,R2));\n"
-				"\tADD(R2,IMM(1));\n"
-				"\tADD(R3,IMM(1));\n"
-				"\tJUMP(LOOP_" unique-tag ");\n"
-				"END_LOOP_" unique-tag ":\n"
-				"\tMOV(R2,R0);\n"
-				"\tMOV(R4,FPARG(1));\n"	;;;;;;;;;;;;
-				"\tADD(R4,IMM(1));\n"	;;;;;;;;;;;;				
-				"\tPUSH(R4);\n";;;;;;;;
-				"\tCALL(MALLOC);\n"
-				"\tDROP(IMM(1));\n"
-				"\tMOV(IND(R2),R0);\n"
-				"\tMOV(R4,IMM(0));\n"
-				"\tMOV(R5,IMM(2));\n"
-				"LOOP_PARAMS_" unique-tag ":\n"
-				"\tCMP(R4,FPARG(1));\n"
-				"\tJUMP_GE(END_LOOP_PARAMS_" unique-tag ");\n"
-				"\tMOV(INDD(R0,R4),FPARG(R5));\n"
-				"\tADD(R5,IMM(1));\n"
-				"\tADD(R4,IMM(1));\n"
-				"\tJUMP(LOOP_PARAMS_" unique-tag ");\n"
-				"END_LOOP_PARAMS_" unique-tag ":\n"
-				"\tMOV(INDD(R0,R4),IMM(11));\n"	;;;;;;;;;;;
-				"\tMOV(INDD(R1,2),LABEL(L_CLOS_CODE_" unique-tag "));\n"
-				"\tMOV(R0,R1);\n"
-				"\tJUMP(L_CLOS_EXIT_" unique-tag ");\n"
+				(cg-base-lambda pe env p-length unique-tag)
 				"\t/* Part B : lambda-variadic " unique-tag "*/\n"
 				"L_CLOS_CODE_" unique-tag ":\n"
 				"\tPUSH(FP);\n"
 				"\tMOV(FP,SP);\n"
+				"\tPUSH(R8);\n"	;;;; *** ;;;
 				"\t/* stack adjustment for lambda-variadic : make a list (based on pairs) */\n"
-				"\tMOV(R8,IMM(FPARG(1)));\n"
-				"\tADD(R8,IMM(1));\n"
+				"\tMOV(R8,FPARG(1));\n"
 				;;;;;;; MAGIC addition
-				"\tCMP(R8,IMM(1));\n"
+				"\tCMP(R8,IMM(0));\n"
 				"\tJUMP_EQ(PARAMS_VARIADIC_MAGIC_" unique-tag ");\n"
 				;;;;;;;;
+				"\tADD(R8,IMM(1));\n"
 				"\tPUSH(IMM(11));\n"
 				"\tPUSH(FPARG(R8));\n"
 				"\tCALL(MAKE_SOB_PAIR);\n"
 				"\tDROP(IMM(2));\n"
 				"\tSUB(R8,IMM(1));\n"
-				;;;;;;; MAGIC addition
-				"\tJUMP(LOOP_PARAMS_VARIADIC_" unique-tag ");\n"
-				"PARAMS_VARIADIC_MAGIC_" unique-tag ":\n"
-				"\tMOV(R0,IMM(11));\n"
-				"\tSUB(R8,IMM(1));\n"
-				;;;;;;;;
 				;loop - make list of T_PAIR
 				"LOOP_PARAMS_VARIADIC_" unique-tag ":\n"
 				"\tCMP(R8,IMM(2));\n"	
@@ -1162,15 +1076,17 @@
 				"\tJUMP(LOOP_PARAMS_VARIADIC_" unique-tag ");\n"
 				"\tEND_LOOP_PARAMS_VARIADIC_" unique-tag ":\n"
 				"\tMOV(FPARG(2),R0);\n"
+				"PARAMS_VARIADIC_MAGIC_" unique-tag ":\n"
 				"\t/* lambda-variadic body */\n"
-				(code-gen body (+ env 1))
+				"\tPOP(R8);\n"	;;;; *** ;;;
+				(code-gen body (+ env 1) 1)
 				"\tPOP(FP);\n"
 				"\tRETURN;\n"
 				"L_CLOS_EXIT_" unique-tag ":\n"
 		))))
 		
 (define cg-applic
-	(lambda (pe env)
+	(lambda (pe env p-length)
 		(set-unique-tag)
 		(let 
 			((unique-tag (number->string current-unique-tag))
@@ -1178,39 +1094,38 @@
 			(operands (cadr pe)))
 			(string-append
 				"\t/* applic_" unique-tag "*/\n"
+				"\tPUSH(R6);\n"	;;;; *** ;;;
 				"\tPUSH(IMM(11));\n"										;;;;;; MAGIC
-				(map-cg-applic operands env unique-tag 0)
+				(map-cg-applic operands env p-length unique-tag 0)
 				"\t/* pushing number of operands to stack */\n"
 				"\tPUSH(IMM(" (number->string (length operands)) "));\n"	;;;;;;
 				"\t/* generate applic's operator code */\n"
-				(code-gen procedure env)
+				(code-gen procedure env p-length)
 				"\t/* final stage of the procedure */\n"
-				"\tCMP(INDD(R0,0),IMM(T_CLOSURE));\n"
+				"\tCMP(IND(R0),IMM(T_CLOSURE));\n"
 				"\tJUMP_NE(ERROR_NST);\n"
 				"\tPUSH(INDD(R0,1));\n"
 				"\tCALLA(INDD(R0,2));\n"
-;				"\tMOV(IND(R1),IMM(2));\n"
-;				"\tADD(IND(R1),IMM("(number->string (length operands))"));\n"
 				"\tMOV(R6,STARG(0));\n"
 				"\tADD(R6,IMM(3));\n"								;;;;;;;; DELETE +1 FOR MAGIC
-				"\tDROP(R6);\n"
-;				"\tMOV(IND(SP),IND(R1));\n"
+				"\tDROP(IMM(R6));\n"
+				"\tPOP(R6);\n"	;;;; *** ;;;
 				))))
 				
 (define map-cg-applic
-	(lambda (blist env unique-tag index)
+	(lambda (blist env p-length unique-tag index)
 		(if (null? blist)
 			""
 			(string-append
-				(map-cg-applic (cdr blist) env unique-tag (+ index 1))
+				(map-cg-applic (cdr blist) env p-length unique-tag (+ index 1))
 				"\t/* applic_" unique-tag " - B" (number->string (+ index 1)) " */\n"
-				(code-gen (car blist) env)
+				(code-gen (car blist) env p-length)
 				"\tPUSH(R0);\n"
 				)
 		)))
 		
 (define cg-tc-applic
-	(lambda (pe env)
+	(lambda (pe env p-length)
 		(set-unique-tag)
 		(let
 			((unique-tag (number->string current-unique-tag))
@@ -1218,11 +1133,11 @@
 			(operands (cadr pe)))
 			(string-append
 				"\t/* tc_applic_" unique-tag "*/\n"
-				(map-cg-applic operands env unique-tag 0)
+				(map-cg-applic operands env p-length unique-tag 0)
 				"\t/* pushing number of operands to stack */\n"
 				"\tPUSH(IMM(" (number->string (length operands)) "));\n"
 				"\t/* generate tc_applic's operator code */\n"
-				(code-gen procedure env)
+				(code-gen procedure env p-length)
 				"\t/* final stage of the procedure */\n"
 				"\tCMP(INDD(R0,0),IMM(T_CLOSURE));\n"
 				"\tJUMP_NE(ERROR_NST);\n"
@@ -1237,9 +1152,9 @@
 			
 			
 (define cg-define
-	(lambda (pe env)
+	(lambda (pe env p-length)
 		(string-append
-			(code-gen (cadr pe) env)
+			(code-gen (cadr pe) env p-length)
 			"\tMOV(R1," (number->string (get-const-address (cadar pe) global-const-address))  ");\n"
 			"\tMOV(R1,INDD(R1,1));\n"
 			"\tMOV(INDD(R1,2),R0);\n"
@@ -1640,7 +1555,10 @@
 	(lambda (inputFileName outputFileName)
 		(let (	(output (open-output-file outputFileName 'replace))			
 				(input (map pe->lex-pe (map parse (tokens->sexprs (list->tokens 
-				(file->list inputFileName))))))) ;;;;add anotate-tc
+					(append 
+						(file->list (string-append (path-parent inputFileName) "/support-code.scm"))
+						(file->list inputFileName))
+				)))))) ;;;;add anotate-tc
 			(set! global-const-address (get-consts input))
 			(display 
 				(string-append
