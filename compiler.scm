@@ -1402,6 +1402,7 @@
 (define get-const-address
 	(lambda (c consts-list)
 		(cond 
+			((null? c) 11)
 			((boolean? c) (if c 14 12)) ;address is hard-coded in boolean, therefore return value is the hard coded address
 			((equal? c (cadar consts-list)) (caddar consts-list)) ;found const! return address
 			(else (get-const-address c (cdr consts-list))) ; keep searching			
@@ -1571,32 +1572,6 @@ int main()
 {
 	START_MACHINE;
 	
-	/* test functions section */
-	void print_heap(){
-		int i;
-		printf(\"\\n\");
-		printf(\"printing heap\\n\");
-		for (i=ADDR(0); i>=0; i--){
-			printf(\"\\t element %d: %d\\n\", i, ADDR(i));
-		}
-	}
-	
-	void print_stack(){
-        int i;
-        printf(\"printing stack, FP: %d SP: %d\\n\", (int)(FP), (int)(SP));
-        for(i=SP+5; i>=0; --i){
-			if(SP == i){
-				printf(\"SP \");
-			}
-			if(FP == i){
-				printf(\"FP \");
-			}
-			printf(\"\\telement %d: %d \\n\", i, STACK(i));
-        }
-	}
-	
-	/* end of test functions section */
-	
 	JUMP(CONTINUE);
 
 	#include \"scheme.lib\"
@@ -1681,3 +1656,28 @@ END:
 				output) ;; check write / display
 			(close-output-port output))))
 			
+	; /* test functions section */
+	; void print_heap(){
+		; int i;
+		; printf(\"\\n\");
+		; printf(\"printing heap\\n\");
+		; for (i=ADDR(0); i>=0; i--){
+			; printf(\"\\t element %d: %d\\n\", i, ADDR(i));
+		; }
+	; }
+	
+	; void print_stack(){
+        ; int i;
+        ; printf(\"printing stack, FP: %d SP: %d\\n\", (int)(FP), (int)(SP));
+        ; for(i=SP+5; i>=0; --i){
+			; if(SP == i){
+				; printf(\"SP \");
+			; }
+			; if(FP == i){
+				; printf(\"FP \");
+			; }
+			; printf(\"\\telement %d: %d \\n\", i, STACK(i));
+        ; }
+	; }
+	
+	; /* end of test functions section */

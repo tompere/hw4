@@ -35,6 +35,19 @@
 		fs)))
       (apply (car ms) ms))))
 
+(define =
+	(letrec ((loop
+				(lambda (a lst)
+					(cond 
+						((null? lst) #t)
+						((not (bin=? a (car lst))) #f)
+						(else (loop (car lst) (cdr lst)))
+					))
+			))
+		(lambda (a . args)
+			(loop a args))
+			))
+	  
 ;;; rename ++ to +
 
 (define +
@@ -45,6 +58,9 @@
 		  (bin+ (car s)
 			(loop (cdr s)))))))
     (lambda s (loop s))))
+
+;;; opt=
+
 
 ;;; rename ** to *
 
